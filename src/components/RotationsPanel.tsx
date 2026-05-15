@@ -73,9 +73,38 @@ export default function RotationsPanel() {
           <h1 className="text-2xl font-bold tracking-tight">Ranking de Rotación GICS</h1>
           <p className="text-sm text-[#666]">Análisis de fuerza relativa y momentum compuesto de los 11 sectores principales.</p>
         </div>
-        <div className="bg-[#141414] border border-[#2A2A2A] px-4 py-2 rounded-sm text-[10px] font-mono text-[#444]">
-          METODOLOGÍA: 60% MOMENTUM + 20% VOL. ADJ. + 20% VOLUMEN
+        <div className="bg-[#141414] border border-[#2A2A2A] px-4 py-2 rounded-sm text-[10px] font-mono text-[#444] flex items-center gap-4">
+          <span className="hidden sm:inline">METODOLOGÍA: 60% MOMENTUM + 20% VOL. ADJ. + 20% VOLUMEN</span>
+          <button 
+            onClick={() => {
+              setLoading(true);
+              // Simple re-triggering of the effect by changing a hidden state if needed or just re-calling the fetch
+              window.location.reload(); 
+            }}
+            className="text-orange-500 hover:text-orange-400 font-bold flex items-center gap-1"
+          >
+            <Activity className="w-3 h-3" /> RECALCULAR
+          </button>
         </div>
+      </div>
+
+      {/* Phase Glossary */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { label: 'Peak', desc: 'Sobrecompra / Distribución', color: 'bg-red-500' },
+          { label: 'Strength', desc: 'Tendencia Consolidada', color: 'bg-green-500' },
+          { label: 'Acceleration', desc: 'Impulso Emergente', color: 'bg-blue-500' },
+          { label: 'Early Rotation', desc: 'Inicio de Ciclo', color: 'bg-orange-500' },
+          { label: 'Weakness', desc: 'Baja Fuerza Relativa', color: 'bg-gray-500' },
+        ].map(p => (
+          <div key={p.label} className="bg-[#0A0A0A] border border-[#1A1A1A] p-3 rounded-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <div className={cn("w-1.5 h-1.5 rounded-full", p.color)}></div>
+              <span className="text-[10px] font-bold text-white uppercase">{p.label}</span>
+            </div>
+            <p className="text-[9px] text-[#444] font-medium leading-tight">{p.desc}</p>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

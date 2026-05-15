@@ -4,13 +4,30 @@ import { cn } from '../lib/utils';
 
 export default function ConfigPanel() {
   const [etfs, setEtfs] = useState<{ ticker: string, name: string, sector: string }[]>([]);
+  const [configs, setConfigs] = useState<Record<string, string>>({});
   const [newEtf, setNewEtf] = useState({ ticker: '', name: '', sector: 'Equity' });
 
   useEffect(() => {
     fetch('/api/config')
       .then(res => res.json())
-      .then(data => setEtfs(data.etfs));
+      .then(data => {
+        setEtfs(data.etfs);
+        const cfgMap = data.configs.reduce((acc: any, c: any) => {
+          acc[c.key] = c.value;
+          return acc;
+        }, {});
+        setConfigs(cfgMap);
+      });
   }, []);
+
+  const handleUpdateConfig = async (key: string, value: string) => {
+    setConfigs(prev => ({ ...prev, [key]: value }));
+    await fetch('/api/config/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value })
+    });
+  };
 
   const handleAddEtf = async () => {
     if (!newEtf.ticker) return;
@@ -116,25 +133,52 @@ export default function ConfigPanel() {
           <div className="space-y-4">
             <div>
               <div className="flex justify-between text-[11px] font-bold text-[#666] uppercase mb-2">
-                <span>Frecuencia de Polling</span>
-                <span className="text-orange-500">60s</span>
+                <span>Peso Momentum</span>
+                <span className="text-orange-500">{parseFloat(configs.rotation_weight_momentum || '0.6') * 100}%</span>
               </div>
-              <input type="range" className="w-full accent-orange-600" />
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.05"
+                value={configs.rotation_weight_momentum || '0.6'}
+                onChange={(e) => handleUpdateConfig('rotation_weight_momentum', e.target.value)}
+                className="w-full accent-orange-600" 
+              />
             </div>
 
             <div>
               <div className="flex justify-between text-[11px] font-bold text-[#666] uppercase mb-2">
-                <span>Agresividad de Rotación</span>
-                <span className="text-orange-500">Moderada</span>
+                <span>Peso Volatilidad</span>
+                <span className="text-orange-500">{parseFloat(configs.rotation_weight_volatility || '0.2') * 100}%</span>
               </div>
-              <select className="bg-[#0A0A0A] border border-[#2A2A2A] text-[#AAA] rounded-sm px-3 py-1.5 text-xs w-full outline-none focus:border-orange-500">
-                <option>Conservadora</option>
-                <option selected>Moderada</option>
-                <option>Agresiva</option>
-                <option>Ultra-Long Term</option>
-              </select>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.05"
+                value={configs.rotation_weight_volatility || '0.2'}
+                onChange={(e) => handleUpdateConfig('rotation_weight_volatility', e.target.value)}
+                className="w-full accent-orange-600" 
+              />
             </div>
-            
+
+            <div>
+              <div className="flex justify-between text-[11px] font-bold text-[#666] uppercase mb-2">
+                <span>Peso Volumen</span>
+                <span className="text-orange-500">{parseFloat(configs.rotation_weight_volume || '0.2') * 100}%</span>
+              </div>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.05"
+                value={configs.rotation_weight_volume || '0.2'}
+                onChange={(e) => handleUpdateConfig('rotation_weight_volume', e.target.value)}
+                className="w-full accent-orange-600" 
+              />
+            </div>
+
             <div className="pt-4 border-t border-[#2A2A2A] space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[#AAA]">Modo Debug</span>

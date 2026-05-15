@@ -29,7 +29,7 @@ st.markdown("""
         text-align: center;
     }
 </style>
-""", unsafe_allow_stdio=True)
+""", unsafe_allow_html=True)
 
 # Inicialización de Agentes
 analista = AgenteAnalista()

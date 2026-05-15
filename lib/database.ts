@@ -42,6 +42,11 @@ export async function initDb() {
     );
   `);
 
+  // Seed default weights if not present
+  await db.run("INSERT OR IGNORE INTO config (key, value) VALUES ('rotation_weight_momentum', '0.6')");
+  await db.run("INSERT OR IGNORE INTO config (key, value) VALUES ('rotation_weight_volatility', '0.2')");
+  await db.run("INSERT OR IGNORE INTO config (key, value) VALUES ('rotation_weight_volume', '0.2')");
+
   // Seed default ETFs if empty
   const countRow = await db.get('SELECT count(*) as count FROM etfs');
   const count = countRow ? (countRow as any).count : 0;

@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { initDb, getDb } from './lib/database';
-import { getQuotes } from './lib/data-fetcher';
+import { getQuotes, getHistoricalData, calculateCorrelation } from './lib/data-fetcher';
 import { AgenteAnalista, AgenteSupervisor, AbogadoDelDiablo } from './lib/agents';
 
 async function startServer() {
@@ -45,20 +45,45 @@ async function startServer() {
   app.get('/api/config', async (req, res) => {
     try {
       const etfs = await db.all('SELECT * FROM etfs');
-      res.json({ etfs });
+      const configs = await db.all('SELECT * FROM config');
+      res.json({ etfs, configs });
     } catch (e) {
       res.status(500).json({ error: 'Error fetching config' });
+    }
+  });
+
+  app.post('/api/config/update', async (req, res) => {
+    const { key, value } = req.body;
+    try {
+      await db.run('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', key, value.toString());
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Error updating config' });
     }
   });
 
   app.get('/api/analytics/rotations', async (req, res) => {
     try {
       const gicsTickers = ['XLE', 'XLB', 'XLI', 'XLY', 'XLP', 'XLV', 'XLF', 'XLK', 'XLC', 'XLU', 'XLRE'];
+      
+      // Fetch weights from DB
+      const weights = await db.all('SELECT * FROM config WHERE key LIKE "rotation_weight_%"');
+      const weightMap = weights.reduce((acc: any, w: any) => {
+        acc[w.key] = parseFloat(w.value);
+        return acc;
+      }, {});
+
+      const wMomentum = weightMap.rotation_weight_momentum || 0.6;
+      const wVol = weightMap.rotation_weight_volatility || 0.2;
+      const wVolume = weightMap.rotation_weight_volume || 0.2;
+
       const quotes = await getQuotes(gicsTickers);
       
       const rotations = quotes.map(q => {
-        // Cálculo del Score de Rotación Compuesto (Simplificado para Fase 2)
-        const score = (q.changePercent * 0.6) + (Math.random() * 2); // Simulación de momentum
+        // Simple momentum proxy: 1-day change + random factor for depth in demo
+        // In a real system, we'd use ROC(20) or similar
+        const baseMomentum = q.changePercent;
+        const score = (baseMomentum * wMomentum) + (Math.random() * 0.5); 
         
         let phase = 'Recovery';
         if (score > 2) phase = 'Peak';
@@ -78,6 +103,7 @@ async function startServer() {
 
       res.json(rotations);
     } catch (e) {
+      console.error(e);
       res.status(500).json({ error: 'Error calculating rotations' });
     }
   });
@@ -94,7 +120,7 @@ async function startServer() {
 
       const matrix: any[] = [];
       for (const t1 of tickers) {
-        const row: Record<string, number> = { symbol: t1 };
+        const row: Record<string, any> = { symbol: t1 };
         for (const t2 of tickers) {
           row[t2] = parseFloat(calculateCorrelation(histData[t1], histData[t2]).toFixed(2));
         }
