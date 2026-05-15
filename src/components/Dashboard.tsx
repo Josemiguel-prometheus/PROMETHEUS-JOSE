@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Minus, Info, AlertCircle } from 'lucide-react';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Info, 
+  AlertCircle, 
+  Gauge, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  ShieldCheck,
+  Zap,
+  Cpu
+} from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion } from 'motion/react';
 
 interface Quote {
   symbol: string;
@@ -10,16 +22,89 @@ interface Quote {
   name: string;
 }
 
+// Sparkline Component
+function Sparkline({ data, color }: { data: number[], color: string }) {
+  if (!data || data.length === 0) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const width = 100;
+  const height = 30;
+  
+  const points = data.map((val, i) => ({
+    x: (i / (data.length - 1)) * width,
+    y: height - ((val - min) / range) * height
+  }));
+
+  const pathContent = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <path
+        d={pathContent}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Sentiment Gauge Component
+function SentimentGauge({ value }: { value: number }) {
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (value / 100) * (circumference / 2);
+  
+  return (
+    <div className="relative flex flex-col items-center">
+      <svg width="100" height="60" className="rotate-[180deg]">
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke="#1A1A1A"
+          strokeWidth="8"
+          fill="none"
+          strokeDasharray={`${circumference / 2} ${circumference / 2}`}
+          strokeLinecap="round"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke={value > 60 ? "#22c55e" : value > 40 ? "#eab308" : "#ef4444"}
+          strokeWidth="8"
+          fill="none"
+          strokeDasharray={`${circumference / 2} ${circumference / 2}`}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 text-center">
+        <span className="text-xl font-bold font-mono tracking-tighter">{value}%</span>
+        <p className="text-[8px] font-bold text-[#666] uppercase tracking-widest leading-none">Confianza</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sentimentValue] = useState(64); // Mock sentiment from agents
 
   useEffect(() => {
     const fetchQuotes = async () => {
       try {
         const res = await fetch('/api/quotes');
         const data = await res.json();
-        const macro = data.filter((q: Quote) => ['SPX', 'VIX', 'DXY', 'US10Y', 'GLD', 'BTC-USD'].includes(q.symbol));
+        const macro = data.filter((q: Quote) => 
+          ['SPX', 'VIX', 'DXY', 'US10Y', 'GLD', 'BTC-USD'].includes(q.symbol)
+        );
         setQuotes(macro);
       } catch (e) {
         console.error(e);
@@ -29,127 +114,199 @@ export default function Dashboard() {
     };
 
     fetchQuotes();
-    const interval = setInterval(fetchQuotes, 60000); // Polling every 60s
+    const interval = setInterval(fetchQuotes, 60000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="space-y-8">
-      {/* Market Condition Banner */}
-      <div className="bg-[#141414] border border-[#2A2A2A] p-6 rounded-sm flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-900/20 border border-blue-500/30 flex items-center justify-center rounded-sm">
-            <Info className="w-6 h-6 text-blue-500" />
-          </div>
-          <div>
-            <h2 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">Condiciones de Mercado Actuales</h2>
-            <p className="text-xl font-bold tracking-tight">Consolidación Lateral - Sesgo Cauto</p>
-          </div>
-        </div>
-        <div className="text-right hidden md:block">
-          <p className="text-[10px] text-[#666] font-mono mb-1">MENSAJE DEL SISTEMA:</p>
-          <p className="text-sm font-medium text-[#AAA]">"El capital fluye hacia los más pacientes en entornos de alta volatilidad inducida."</p>
-        </div>
-      </div>
-
-      {/* Macro Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          Array(6).fill(0).map((_, i) => (
-            <div key={i} className="h-32 bg-[#141414] border border-[#1A1A1A] animate-pulse rounded-sm"></div>
-          ))
-        ) : (
-          quotes.map((quote) => (
-            <div key={quote.symbol} className="bg-[#141414] border border-[#2A2A2A] p-5 rounded-sm hover:border-[#444] transition-all group">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="text-[10px] font-bold text-[#666] uppercase tracking-widest">{quote.name}</p>
-                  <h3 className="text-2xl font-mono font-bold tracking-tighter">{quote.symbol === 'SPX' ? 'S&P 500' : quote.symbol}</h3>
-                </div>
-                <div className={cn(
-                  "flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-sm",
-                  quote.change >= 0 ? "bg-green-950 text-green-500" : "bg-red-950 text-red-500"
-                )}>
-                  {quote.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {Math.abs(quote.changePercent).toFixed(2)}%
-                </div>
+    <div className="space-y-6">
+      {/* Top Bento Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        {/* Market Condition - Large Card */}
+        <div className="lg:col-span-3 bg-[#0F0F0F] border border-[#1A1A1A] p-6 rounded-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 blur-[100px] -mr-32 -mt-32 transition-all group-hover:bg-orange-500/10"></div>
+          
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 bg-orange-600/10 border border-orange-500/20 flex items-center justify-center rounded-sm">
+                <ShieldCheck className="w-7 h-7 text-orange-500" />
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold tracking-tight">
-                  {quote.symbol.includes('USD') || quote.symbol === 'GLD' ? '$' : ''}
-                  {quote.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  {quote.symbol === 'US10Y' ? '%' : ''}
-                </span>
-                <span className={cn(
-                  "text-xs font-mono",
-                  quote.change >= 0 ? "text-green-600" : "text-red-600"
-                )}>
-                  {quote.change >= 0 ? '+' : ''}{quote.change.toFixed(2)}
-                </span>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-[10px] font-bold text-orange-500 uppercase tracking-[0.2em]">SITUACIÓN SISTÉMICA</h2>
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                </div>
+                <p className="text-2xl font-bold tracking-tight text-white mb-1">Entorno de Acumulación Estratégica</p>
+                <div className="flex items-center gap-4 text-[#666] text-xs">
+                  <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> Momentum: Neutral</span>
+                  <span className="flex items-center gap-1"><Gauge className="w-3 h-3" /> Volatilidad: Decreciente</span>
+                </div>
               </div>
             </div>
-          ))
-        )}
+
+            <div className="flex items-center gap-8 md:border-l md:border-[#1A1A1A] md:pl-8">
+              <SentimentGauge value={sentimentValue} />
+              <div className="hidden sm:block">
+                <p className="text-[10px] text-[#444] font-bold uppercase tracking-widest mb-1">RECOMENDACIÓN</p>
+                <p className="text-sm font-bold text-white uppercase italic">"Patience is Alpha"</p>
+                <p className="text-[10px] text-[#666] mt-1 max-w-[140px]">Optimización de costes y reducción de apalancamiento.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Small Highlight Card */}
+        <div className="bg-[#0F0F0F] border border-[#1A1A1A] p-6 rounded-sm flex flex-col justify-between hover:border-[#333] transition-all">
+          <div>
+            <h3 className="text-[10px] font-bold text-[#666] uppercase tracking-widest mb-2">Alpha del Día</h3>
+            <p className="text-lg font-bold text-white leading-tight">Rotación hacia Commodities Energéticas</p>
+          </div>
+          <div className="flex items-center justify-between pt-4 border-t border-[#1A1A1A]">
+            <span className="text-[10px] font-mono text-orange-500">CONVICCIÓN AGENTE: ALTA</span>
+            <ArrowUpRight className="w-4 h-4 text-orange-500" />
+          </div>
+        </div>
       </div>
 
-      {/* Sector Insight */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-[#666]">Rendimiento por Sectores (GICS)</h3>
-          </div>
-          <div className="bg-[#141414] border border-[#2A2A2A] rounded-sm divide-y divide-[#1A1A1A]">
-            {[
-              { name: 'Tecnología', change: 1.2, status: 'Outperforming' },
-              { name: 'Energía', change: -0.8, status: 'Underperforming' },
-              { name: 'Financiero', change: 0.3, status: 'Neutral' },
-              { name: 'Salud', change: 0.1, status: 'Neutral' },
-              { name: 'Consumo Básico', change: 0.5, status: 'Defensive' },
-            ].map((sector) => (
-              <div key={sector.name} className="p-4 flex items-center justify-between hover:bg-[#1A1A1A] transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className={cn("w-1.5 h-6 rounded-full", 
-                    sector.change > 0 ? "bg-green-500" : sector.change < 0 ? "bg-red-500" : "bg-gray-500"
-                  )}></div>
-                  <span className="font-bold text-sm tracking-tight">{sector.name}</span>
-                </div>
-                <div className="flex items-center gap-8">
-                  <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter border",
-                    sector.status === 'Outperforming' ? "border-green-500 text-green-500" : 
-                    sector.status === 'Underperforming' ? "border-red-500 text-red-500" : 
-                    "border-gray-600 text-gray-500"
+      {/* Main Grid: Metrics + Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left Col: Core Metrics (Scrollable list or tight grid) */}
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {loading ? (
+            Array(6).fill(0).map((_, i) => (
+              <div key={i} className="h-28 bg-[#0F0F0F] border border-[#1A1A1A] animate-pulse rounded-sm"></div>
+            ))
+          ) : (
+            quotes.map((quote) => (
+              <motion.div 
+                key={quote.symbol}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-[#0F0F0F] border border-[#1A1A1A] p-4 rounded-sm flex flex-col justify-between hover:bg-[#121212] transition-colors"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="text-[10px] font-bold text-[#444] uppercase tracking-tighter mb-0.5">{quote.name}</h4>
+                    <span className="text-base font-mono font-bold text-white">{quote.symbol}</span>
+                  </div>
+                  <div className={cn(
+                    "px-2 py-0.5 rounded-sm text-[10px] font-bold font-mono border",
+                    quote.change >= 0 ? "text-green-500 border-green-500/20 bg-green-500/5" : "text-red-500 border-red-500/20 bg-red-500/5"
                   )}>
-                    {sector.status}
-                  </span>
-                  <span className={cn("font-mono font-bold text-sm", sector.change >= 0 ? "text-green-500" : "text-red-500")}>
-                    {sector.change >= 0 ? '+' : ''}{sector.change}%
-                  </span>
+                    {quote.change >= 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
+                  </div>
                 </div>
+                
+                <div className="flex items-end justify-between gap-4 mt-4">
+                  <div className="flex flex-col">
+                    <span className="text-xl font-mono font-bold tracking-tighter">
+                      {quote.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className={cn("text-[10px] font-mono", quote.change >= 0 ? "text-green-600" : "text-red-600")}>
+                      {quote.change >= 0 ? '+' : ''}{quote.change.toFixed(2)}
+                    </span>
+                  </div>
+                  <Sparkline 
+                    data={Array.from({length: 10}, () => Math.random() * 100)} 
+                    color={quote.change >= 0 ? "#22c55e" : "#ef4444"} 
+                  />
+                </div>
+              </motion.div>
+            ))
+          )}
+        </div>
+
+        {/* Right Col: Agent Commentary Stack */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-[10px] font-bold text-[#666] uppercase tracking-widest">FEED DE AGENTES (GENESIS)</h3>
+            <div className="flex gap-1">
+              <div className="w-1 h-1 rounded-full bg-orange-500"></div>
+              <div className="w-1 h-1 rounded-full bg-[#1A1A1A]"></div>
+              <div className="w-1 h-1 rounded-full bg-[#1A1A1A]"></div>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            {[
+              { 
+                agent: 'Analista', 
+                icon: Cpu, 
+                msg: 'Fuerte descorrelación detectada en BTC vs Tech. Posible formación de suelo.',
+                time: '2m ago'
+              },
+              { 
+                agent: 'Supervisor', 
+                icon: ShieldCheck, 
+                msg: 'Límites de riesgo operativos. El DXY estable permite mayor exposición a EM.',
+                time: '5m ago'
+              },
+              { 
+                agent: 'Diablo', 
+                icon: Zap, 
+                msg: 'Alerta: Los rendimientos del 10Y amenazan con romper resistencia de 4.2%.',
+                time: '12m ago'
+              },
+            ].map((entry, idx) => (
+              <div key={idx} className="bg-[#0F0F0F] border border-[#1A1A1A] p-4 rounded-sm hover:border-[#333] transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <entry.icon className="w-3 h-3 text-[#555]" />
+                    <span className="text-[9px] font-bold text-[#AAA] uppercase tracking-widest">{entry.agent}</span>
+                  </div>
+                  <span className="text-[8px] font-mono text-[#444]">{entry.time}</span>
+                </div>
+                <p className="text-[11px] text-[#888] leading-relaxed italic border-l border-orange-500/20 pl-3">
+                  "{entry.msg}"
+                </p>
               </div>
             ))}
           </div>
-        </div>
 
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-[#666]">Alerta de Riesgo (Risk Matrix)</h3>
-          <div className="bg-red-950/20 border border-red-500/20 p-6 rounded-sm space-y-4">
-            <div className="flex items-center gap-3 text-red-500">
-              <AlertCircle className="w-5 h-5" />
-              <span className="text-sm font-bold uppercase tracking-wider">Ajuste de Volatilidad</span>
-            </div>
-            <p className="text-xs text-[#AAA] leading-relaxed">
-              El VIX muestra divergencia con el spot del SPX. El sistema recomienda estrechar stops en posiciones de growth y aumentar exposición a renta fija de corto plazo (BIL/SHY).
-            </p>
-            <div className="pt-2 border-t border-red-500/10">
-              <div className="flex justify-between text-[10px] font-mono text-red-500/60 uppercase mb-2">
-                <span>Nivel de Alerta</span>
-                <span>4 / 10</span>
-              </div>
-              <div className="h-1 bg-red-900/30 rounded-full overflow-hidden">
-                <div className="h-full bg-red-500 w-[40%]"></div>
-              </div>
-            </div>
+          <div className="bg-red-950/10 border border-red-500/20 p-4 rounded-sm">
+             <div className="flex items-center gap-2 text-red-500 mb-2">
+               <AlertCircle className="w-4 h-4" />
+               <span className="text-[10px] font-bold uppercase tracking-widest">Risk Guard Active</span>
+             </div>
+             <p className="text-[10px] text-[#666] font-medium leading-normal">
+               Exposición máxima en sector energético alcanzada. El sistema bloquea nuevas compras de XLE/XOP hasta normalización de volumen.
+             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Bottom Row: Sector Heatmap Preview */}
+      <div className="bg-[#0F0F0F] border border-[#1A1A1A] p-6 rounded-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-[#666]">Matriz de Rendimiento GICS</h3>
+            <span className="text-[9px] bg-[#1A1A1A] px-2 py-0.5 rounded-full text-[#444]">Real-Time Weights</span>
+          </div>
+          <button className="text-[10px] font-bold text-orange-500 hover:underline uppercase tracking-widest">Analizar Sectores</button>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {[
+            { s: 'XLK', n: 'Tech', v: 1.2 },
+            { s: 'XLE', n: 'Energy', v: -0.4 },
+            { s: 'XLF', n: 'Finance', v: 0.1 },
+            { s: 'XLV', n: 'Health', v: 0.5 },
+            { s: 'XLY', n: 'Cons. Disc', v: -1.2 },
+            { s: 'XLP', n: 'Cons. Stap', v: 0.8 },
+          ].map((sector) => (
+            <div key={sector.s} className="bg-[#0A0A0A] border border-[#1A1A1A] p-3 rounded-sm flex flex-col items-center justify-center gap-1 group hover:border-[#444] transition-all cursor-crosshair">
+              <span className="text-[10px] font-bold text-[#444] group-hover:text-white transition-colors">{sector.s}</span>
+              <div className={cn(
+                "h-1 w-full rounded-full",
+                sector.v > 0.5 ? "bg-green-500" : sector.v > 0 ? "bg-green-800" : sector.v > -0.5 ? "bg-red-800" : "bg-red-500"
+              )}></div>
+              <span className={cn("text-xs font-mono font-bold", sector.v >= 0 ? "text-green-500" : "text-red-500")}>
+                {sector.v > 0 ? '+' : ''}{sector.v}%
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
