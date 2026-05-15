@@ -8,9 +8,11 @@ import {
   Grid3X3, 
   Info,
   Layers,
-  Activity
+  Activity,
+  Maximize2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import SectorDrilldown from './SectorDrilldown';
 
 interface RotationSector {
   symbol: string;
@@ -28,20 +30,25 @@ interface CorrelationRow {
 export default function RotationsPanel() {
   const [rotations, setRotations] = useState<RotationSector[]>([]);
   const [correlation, setCorrelation] = useState<CorrelationRow[]>([]);
+  const [etfs, setEtfs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [corrWindow, setCorrWindow] = useState('60d');
+  const [selectedSector, setSelectedSector] = useState<RotationSector | null>(null);
 
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [rotRes, corrRes] = await Promise.all([
+        const [rotRes, corrRes, configRes] = await Promise.all([
           fetch('/api/analytics/rotations'),
-          fetch('/api/analytics/correlation')
+          fetch('/api/analytics/correlation'),
+          fetch('/api/config')
         ]);
         setRotations(await rotRes.json());
         setCorrelation(await corrRes.json());
+        const configData = await configRes.json();
+        setEtfs(configData.etfs);
         setLastUpdated(new Date());
       } catch (e) {
         console.error(e);
@@ -50,7 +57,7 @@ export default function RotationsPanel() {
       }
     };
     fetchData();
-    const interval = setInterval(fetchData, 20000); // 20s for rotations
+    const interval = setInterval(fetchData, 20000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -138,7 +145,13 @@ export default function RotationsPanel() {
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col">
-                          <span className="font-bold text-sm text-white">{sector.symbol}</span>
+                          <button 
+                            onClick={() => setSelectedSector(sector)}
+                            className="font-bold text-sm text-white hover:text-orange-500 transition-colors text-left flex items-center gap-2"
+                          >
+                            {sector.symbol}
+                            <Maximize2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </button>
                           <span className="text-[10px] text-[#444] uppercase truncate max-w-[150px]">{sector.name.replace(' Select Sector SPDR Fund', '')}</span>
                         </div>
                       </td>
@@ -251,6 +264,13 @@ export default function RotationsPanel() {
           </div>
         </div>
       </div>
+      {selectedSector && (
+        <SectorDrilldown 
+            sector={selectedSector} 
+            etfs={etfs} 
+            onClose={() => setSelectedSector(null)} 
+        />
+      )}
     </div>
   );
 }

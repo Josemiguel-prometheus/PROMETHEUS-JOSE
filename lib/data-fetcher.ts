@@ -50,7 +50,9 @@ export async function getHistoricalData(symbol: string, days: number = 30) {
     'SPX': '^GSPC',
     'VIX': '^VIX',
     'DXY': 'DX-Y.NYB',
-    'US10Y': '^TNX'
+    'US10Y': '^TNX',
+    'US30Y': '^TYX',
+    'BTC-USD': 'BTC-USD'
   };
   const normalizedSymbol = replacements[symbol] || symbol;
   const end = new Date();
@@ -58,12 +60,22 @@ export async function getHistoricalData(symbol: string, days: number = 30) {
   start.setDate(end.getDate() - days);
 
   try {
-    const queryOptions = { period1: start, period2: end };
-    return await yahooFinance.historical(normalizedSymbol, queryOptions);
+    const queryOptions = { 
+      period1: start, 
+      period2: end,
+      interval: '1d' as any
+    };
+    const result: any = await yahooFinance.historical(normalizedSymbol, queryOptions);
+    return result.filter((d: any) => d.close != null);
   } catch (e) {
-    console.error(`Error fetching history for ${symbol}:`, e);
+    console.warn(`Error fetching history for ${symbol}:`, e);
     return [];
   }
+}
+
+export function calculateROC(current: number, previous: number) {
+  if (!previous || previous === 0) return 0;
+  return ((current - previous) / previous) * 100;
 }
 
 export function calculateCorrelation(arr1: number[], arr2: number[]) {

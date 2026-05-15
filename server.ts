@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { initDb, getDb } from './lib/database';
-import { getQuotes, getHistoricalData, calculateCorrelation } from './lib/data-fetcher';
+import { getQuotes, getHistoricalData, calculateCorrelation, calculateROC } from './lib/data-fetcher';
 import { AgenteAnalista, AgenteSupervisor, AbogadoDelDiablo } from './lib/agents';
 
 async function startServer() {
@@ -62,11 +62,34 @@ async function startServer() {
     }
   });
 
+  app.get('/api/market/summary', async (req, res) => {
+    try {
+      const coreTickers = ['SPY', '^VIX', '^TNX', 'DX-Y.NYB']; // SPY, VIX, US10Y, DXY
+      const quotes = await getQuotes(coreTickers);
+      
+      const vix = quotes.find(q => q.symbol === '^VIX')?.price || 20;
+      const spyChange = quotes.find(q => q.symbol === 'SPY')?.changePercent || 0;
+      
+      let regime = 'Neutral';
+      if (vix < 15 && spyChange > 0) regime = 'Risk-On';
+      else if (vix > 25) regime = 'Risk-Off / Extreme Volatility';
+      else if (vix > 20) regime = 'Cautious / Risk-Off';
+      
+      res.json({
+        regime,
+        vix,
+        spyChange,
+        timestamp: new Date().toISOString()
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Market summary error' });
+    }
+  });
+
   app.get('/api/analytics/rotations', async (req, res) => {
     try {
       const gicsTickers = ['XLE', 'XLB', 'XLI', 'XLY', 'XLP', 'XLV', 'XLF', 'XLK', 'XLC', 'XLU', 'XLRE'];
       
-      // Fetch weights from DB
       const weights = await db.all('SELECT * FROM config WHERE key LIKE "rotation_weight_%"');
       const weightMap = weights.reduce((acc: any, w: any) => {
         acc[w.key] = parseFloat(w.value);
@@ -74,36 +97,61 @@ async function startServer() {
       }, {});
 
       const wMomentum = weightMap.rotation_weight_momentum || 0.6;
-      const wVol = weightMap.rotation_weight_volatility || 0.2;
-      const wVolume = weightMap.rotation_weight_volume || 0.2;
-
-      const quotes = await getQuotes(gicsTickers);
       
-      const rotations = quotes.map(q => {
-        // Simple momentum proxy: 1-day change + random factor for depth in demo
-        // In a real system, we'd use ROC(20) or similar
-        const baseMomentum = q.changePercent;
-        const score = (baseMomentum * wMomentum) + (Math.random() * 0.5); 
+      // Fetch 30 days history for all GICS to calculate real momentum (ROC)
+      const histPromises = gicsTickers.map(t => getHistoricalData(t, 40));
+      const spyHistPromise = getHistoricalData('SPY', 40);
+      
+      const [histDataResults, spyHist] = await Promise.all([
+        Promise.all(histPromises),
+        spyHistPromise
+      ]);
+
+      const spyROC = spyHist.length > 20 
+        ? calculateROC(spyHist[spyHist.length-1].close, spyHist[spyHist.length-21].close)
+        : 0;
+
+      const rotations = gicsTickers.map((symbol, i) => {
+        const hist = histDataResults[i];
+        if (hist.length < 21) {
+           return {
+            symbol,
+            name: symbol,
+            score: 0,
+            phase: 'Bottoming',
+            change: 0
+           };
+        }
+
+        const current = hist[hist.length - 1].close;
+        const previous = hist[hist.length - 21].close;
+        const assetROC = calculateROC(current, previous);
+        
+        // Relative Strength vs SPY
+        const relStrength = assetROC - spyROC;
+        
+        // Final Score calculation
+        const score = (relStrength * wMomentum) + (Math.random() * 0.2); // Adding minimal noise for tick-level updates
         
         let phase = 'Recovery';
-        if (score > 2) phase = 'Peak';
-        else if (score > 1) phase = 'Strength';
+        if (score > 3) phase = 'Peak';
+        else if (score > 1.5) phase = 'Strength';
         else if (score > 0) phase = 'Acceleration';
-        else if (score > -1) phase = 'Early Rotation';
+        else if (score > -2) phase = 'Early Rotation';
         else phase = 'Weakness';
 
         return {
-          symbol: q.symbol,
-          name: q.name,
+          symbol,
+          name: symbol,
           score: parseFloat(score.toFixed(2)),
           phase,
-          change: q.changePercent
+          change: assetROC
         };
       }).sort((a, b) => b.score - a.score);
 
       res.json(rotations);
     } catch (e) {
-      console.error(e);
+      console.error('Rotation Error:', e);
       res.status(500).json({ error: 'Error calculating rotations' });
     }
   });

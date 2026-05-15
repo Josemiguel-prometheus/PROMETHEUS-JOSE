@@ -94,19 +94,29 @@ function SentimentGauge({ value }: { value: number }) {
 
 export default function Dashboard() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [marketSummary, setMarketSummary] = useState<any>(null);
+  const [rotations, setRotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [sentimentValue] = useState(64); // Mock sentiment from agents
+  const [sentimentValue] = useState(72); 
 
   useEffect(() => {
-    const fetchQuotes = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch('/api/quotes');
-        const data = await res.json();
-        const macro = data.filter((q: Quote) => 
-          ['SPX', 'VIX', 'DXY', 'US10Y', 'GLD', 'BTC-USD'].includes(q.symbol)
+        const [quotesRes, summaryRes, rotationsRes] = await Promise.all([
+          fetch('/api/quotes'),
+          fetch('/api/market/summary'),
+          fetch('/api/analytics/rotations')
+        ]);
+        
+        const quotesData = await quotesRes.json();
+        const macro = quotesData.filter((q: Quote) => 
+          ['SPX', 'VIX', 'DXY', 'US10Y', 'GLD', 'BTC-USD', 'TLT'].includes(q.symbol)
         );
+        
         setQuotes(macro);
+        setMarketSummary(await summaryRes.json());
+        setRotations(await rotationsRes.json());
         setLastUpdated(new Date());
       } catch (e) {
         console.error(e);
@@ -115,8 +125,8 @@ export default function Dashboard() {
       }
     };
 
-    fetchQuotes();
-    const interval = setInterval(fetchQuotes, 10000); // 10s for real-time feel
+    fetchData();
+    const interval = setInterval(fetchData, 10000); // 10s synchronization
     return () => clearInterval(interval);
   }, []);
 
@@ -139,10 +149,12 @@ export default function Dashboard() {
                   <h2 className="text-[10px] font-bold text-orange-500 uppercase tracking-[0.2em]">SITUACIÓN SISTÉMICA</h2>
                   <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
                 </div>
-                <p className="text-2xl font-bold tracking-tight text-white mb-1">Entorno de Acumulación Estratégica</p>
+                <p className="text-2xl font-bold tracking-tight text-white mb-1">
+                  {marketSummary ? `Régimen: ${marketSummary.regime}` : 'Calculando Régimen...'}
+                </p>
                 <div className="flex items-center gap-4 text-[#666] text-xs">
-                  <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> Momentum: Neutral</span>
-                  <span className="flex items-center gap-1"><Gauge className="w-3 h-3" /> Volatilidad: Decreciente</span>
+                  <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> Momentum: {marketSummary?.spyChange > 0 ? 'Fuerte' : 'Neutral'}</span>
+                  <span className="flex items-center gap-1"><Gauge className="w-3 h-3" /> VIX: {marketSummary?.vix.toFixed(2) || '---'}</span>
                 </div>
               </div>
             </div>
@@ -151,15 +163,17 @@ export default function Dashboard() {
               <div className="flex flex-col items-center justify-center mr-4">
                 <div className="flex items-center gap-1.5 mb-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                  <span className="text-[8px] font-bold text-green-500 uppercase tracking-widest">LIVE</span>
+                  <span className="text-[8px] font-bold text-green-500 uppercase tracking-widest">LIVE SYNC</span>
                 </div>
                 <span className="text-[9px] font-mono text-[#444]">{lastUpdated.toLocaleTimeString()}</span>
               </div>
               <SentimentGauge value={sentimentValue} />
               <div className="hidden sm:block">
                 <p className="text-[10px] text-[#444] font-bold uppercase tracking-widest mb-1">RECOMENDACIÓN</p>
-                <p className="text-sm font-bold text-white uppercase italic">"Patience is Alpha"</p>
-                <p className="text-[10px] text-[#666] mt-1 max-w-[140px]">Optimización de costes y reducción de apalancamiento.</p>
+                <p className="text-sm font-bold text-white uppercase italic">
+                   {marketSummary?.vix < 15 ? '"Patience is Alpha - Stay Growth"' : '"Hedging Strategically Required"'}
+                </p>
+                <p className="text-[10px] text-[#666] mt-1 max-w-[140px]">Basado en el análisis de rotación GICS actual.</p>
               </div>
             </div>
           </div>
@@ -169,7 +183,9 @@ export default function Dashboard() {
         <div className="bg-[#0F0F0F] border border-[#1A1A1A] p-6 rounded-sm flex flex-col justify-between hover:border-[#333] transition-all">
           <div>
             <h3 className="text-[10px] font-bold text-[#666] uppercase tracking-widest mb-2">Alpha del Día</h3>
-            <p className="text-lg font-bold text-white leading-tight">Rotación hacia Commodities Energéticas</p>
+            <p className="text-lg font-bold text-white leading-tight">
+              {rotations[0] ? `Liderazgo: ${rotations[0].symbol}` : 'Escaneando Sectores...'}
+            </p>
           </div>
           <div className="flex items-center justify-between pt-4 border-t border-[#1A1A1A]">
             <span className="text-[10px] font-mono text-orange-500">CONVICCIÓN AGENTE: ALTA</span>
@@ -291,31 +307,33 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <h3 className="text-xs font-bold uppercase tracking-widest text-[#666]">Matriz de Rendimiento GICS</h3>
-            <span className="text-[9px] bg-[#1A1A1A] px-2 py-0.5 rounded-full text-[#444]">Real-Time Weights</span>
+            <span className="text-[9px] bg-[#1A1A1A] px-2 py-0.5 rounded-full text-[#444]">Relative vs SPY</span>
           </div>
-          <button className="text-[10px] font-bold text-orange-500 hover:underline uppercase tracking-widest">Analizar Sectores</button>
+          <button className="text-[10px] font-bold text-orange-500 hover:underline uppercase tracking-widest">Ver Ranking Completo</button>
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {[
-            { s: 'XLK', n: 'Tech', v: 1.2 },
-            { s: 'XLE', n: 'Energy', v: -0.4 },
-            { s: 'XLF', n: 'Finance', v: 0.1 },
-            { s: 'XLV', n: 'Health', v: 0.5 },
-            { s: 'XLY', n: 'Cons. Disc', v: -1.2 },
-            { s: 'XLP', n: 'Cons. Stap', v: 0.8 },
-          ].map((sector) => (
-            <div key={sector.s} className="bg-[#0A0A0A] border border-[#1A1A1A] p-3 rounded-sm flex flex-col items-center justify-center gap-1 group hover:border-[#444] transition-all cursor-crosshair">
-              <span className="text-[10px] font-bold text-[#444] group-hover:text-white transition-colors">{sector.s}</span>
-              <div className={cn(
-                "h-1 w-full rounded-full",
-                sector.v > 0.5 ? "bg-green-500" : sector.v > 0 ? "bg-green-800" : sector.v > -0.5 ? "bg-red-800" : "bg-red-500"
-              )}></div>
-              <span className={cn("text-xs font-mono font-bold", sector.v >= 0 ? "text-green-500" : "text-red-500")}>
-                {sector.v > 0 ? '+' : ''}{sector.v}%
-              </span>
-            </div>
-          ))}
+          {loading ? (
+            Array(11).fill(0).map((_, i) => (
+              <div key={i} className="h-16 bg-[#0A0A0A] border border-[#1A1A1A] animate-pulse rounded-sm"></div>
+            ))
+          ) : (
+            rotations.map((sector) => (
+              <div key={sector.symbol} className="bg-[#0A0A0A] border border-[#1A1A1A] p-3 rounded-sm flex flex-col items-center justify-center gap-1 group hover:border-[#444] transition-all cursor-crosshair">
+                <span className="text-[10px] font-bold text-[#444] group-hover:text-white transition-colors">{sector.symbol}</span>
+                <div className={cn(
+                  "h-1 w-full rounded-full",
+                  sector.score > 1.5 ? "bg-green-500" : sector.score > 0 ? "bg-green-800" : sector.score > -1.5 ? "bg-red-800" : "bg-red-500"
+                )}></div>
+                <div className="flex items-center justify-between w-full mt-1">
+                  <span className={cn("text-[9px] font-mono font-bold", sector.score >= 0 ? "text-green-500" : "text-red-500")}>
+                    {sector.score > 0 ? '+' : ''}{sector.score}
+                  </span>
+                  <span className="text-[8px] font-bold text-[#333] uppercase">{sector.phase.split(' ')[0]}</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
