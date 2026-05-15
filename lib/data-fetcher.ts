@@ -24,7 +24,7 @@ export async function getQuotes(symbols: string[]): Promise<AssetQuote[]> {
             'DJI': '^DJI'
           };
           const normalizedSymbol = replacements[symbol] || symbol;
-          const quote = await yahooFinance.quote(normalizedSymbol);
+          const quote: any = await yahooFinance.quote(normalizedSymbol);
           return {
             symbol,
             price: quote.regularMarketPrice || 0,

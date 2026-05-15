@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { History, TrendingUp, Filter } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 const MOCK_HISTORICAL_DATA = [
   { name: '09:00', spy: 440, qqq: 370 },

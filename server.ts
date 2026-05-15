@@ -1,13 +1,17 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import db from './lib/database';
+import { initDb, getDb } from './lib/database';
 import { getQuotes } from './lib/data-fetcher';
 import { AgenteAnalista, AgenteSupervisor, AbogadoDelDiablo } from './lib/agents';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Initialize DB before anything else
+  await initDb();
+  const db = getDb();
 
   app.use(express.json());
 
@@ -19,29 +23,38 @@ async function startServer() {
   // API Routes
   app.get('/api/quotes', async (req, res) => {
     try {
-      const etfs = db.prepare('SELECT ticker FROM etfs').all() as { ticker: string }[];
-      const tickers = etfs.map(e => e.ticker);
+      const etfs = await db.all('SELECT ticker FROM etfs');
+      const tickers = etfs.map(e => (e as any).ticker);
       const quotes = await getQuotes(tickers);
       res.json(quotes);
     } catch (error) {
+      console.error(error);
       res.status(500).json({ error: 'Error fetching quotes' });
     }
   });
 
-  app.get('/api/logs', (req, res) => {
-    const logs = db.prepare('SELECT * FROM logs ORDER BY timestamp DESC LIMIT 50').all();
-    res.json(logs);
+  app.get('/api/logs', async (req, res) => {
+    try {
+      const logs = await db.all('SELECT * FROM logs ORDER BY timestamp DESC LIMIT 50');
+      res.json(logs);
+    } catch (e) {
+      res.status(500).json({ error: 'Error fetching logs' });
+    }
   });
 
-  app.get('/api/config', (req, res) => {
-    const etfs = db.prepare('SELECT * FROM etfs').all();
-    res.json({ etfs });
+  app.get('/api/config', async (req, res) => {
+    try {
+      const etfs = await db.all('SELECT * FROM etfs');
+      res.json({ etfs });
+    } catch (e) {
+      res.status(500).json({ error: 'Error fetching config' });
+    }
   });
 
-  app.post('/api/config/etf', (req, res) => {
+  app.post('/api/config/etf', async (req, res) => {
     const { ticker, name, sector } = req.body;
     try {
-      db.prepare('INSERT INTO etfs (ticker, name, sector) VALUES (?, ?, ?)').run(ticker, name, sector);
+      await db.run('INSERT INTO etfs (ticker, name, sector) VALUES (?, ?, ?)', ticker, name, sector);
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: 'Duplicate or invalid ticker' });
@@ -49,11 +62,15 @@ async function startServer() {
   });
 
   app.post('/api/refresh', async (req, res) => {
-    // Manually trigger agent cycle
-    const analysis = await analista.analyze({});
-    await supervisor.supervise(analysis);
-    await diablo.challenge(analysis);
-    res.json({ success: true, analysis });
+    try {
+      // Manually trigger agent cycle
+      const analysis = await analista.analyze({});
+      await supervisor.supervise(analysis);
+      await diablo.challenge(analysis);
+      res.json({ success: true, analysis });
+    } catch (e) {
+      res.status(500).json({ error: 'Error during agent cycle' });
+    }
   });
 
   // Vite middleware for development
