@@ -95,6 +95,7 @@ function SentimentGauge({ value }: { value: number }) {
 export default function Dashboard() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [sentimentValue] = useState(64); // Mock sentiment from agents
 
   useEffect(() => {
@@ -106,6 +107,7 @@ export default function Dashboard() {
           ['SPX', 'VIX', 'DXY', 'US10Y', 'GLD', 'BTC-USD'].includes(q.symbol)
         );
         setQuotes(macro);
+        setLastUpdated(new Date());
       } catch (e) {
         console.error(e);
       } finally {
@@ -114,7 +116,7 @@ export default function Dashboard() {
     };
 
     fetchQuotes();
-    const interval = setInterval(fetchQuotes, 60000);
+    const interval = setInterval(fetchQuotes, 10000); // 10s for real-time feel
     return () => clearInterval(interval);
   }, []);
 
@@ -146,6 +148,13 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-8 md:border-l md:border-[#1A1A1A] md:pl-8">
+              <div className="flex flex-col items-center justify-center mr-4">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                  <span className="text-[8px] font-bold text-green-500 uppercase tracking-widest">LIVE</span>
+                </div>
+                <span className="text-[9px] font-mono text-[#444]">{lastUpdated.toLocaleTimeString()}</span>
+              </div>
               <SentimentGauge value={sentimentValue} />
               <div className="hidden sm:block">
                 <p className="text-[10px] text-[#444] font-bold uppercase tracking-widest mb-1">RECOMENDACIÓN</p>

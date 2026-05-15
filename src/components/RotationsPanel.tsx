@@ -31,6 +31,8 @@ export default function RotationsPanel() {
   const [loading, setLoading] = useState(true);
   const [corrWindow, setCorrWindow] = useState('60d');
 
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -40,6 +42,7 @@ export default function RotationsPanel() {
         ]);
         setRotations(await rotRes.json());
         setCorrelation(await corrRes.json());
+        setLastUpdated(new Date());
       } catch (e) {
         console.error(e);
       } finally {
@@ -47,6 +50,8 @@ export default function RotationsPanel() {
       }
     };
     fetchData();
+    const interval = setInterval(fetchData, 20000); // 20s for rotations
+    return () => clearInterval(interval);
   }, []);
 
   const getPhaseColor = (phase: string) => {
@@ -73,18 +78,14 @@ export default function RotationsPanel() {
           <h1 className="text-2xl font-bold tracking-tight">Ranking de Rotación GICS</h1>
           <p className="text-sm text-[#666]">Análisis de fuerza relativa y momentum compuesto de los 11 sectores principales.</p>
         </div>
-        <div className="bg-[#141414] border border-[#2A2A2A] px-4 py-2 rounded-sm text-[10px] font-mono text-[#444] flex items-center gap-4">
-          <span className="hidden sm:inline">METODOLOGÍA: 60% MOMENTUM + 20% VOL. ADJ. + 20% VOLUMEN</span>
-          <button 
-            onClick={() => {
-              setLoading(true);
-              // Simple re-triggering of the effect by changing a hidden state if needed or just re-calling the fetch
-              window.location.reload(); 
-            }}
-            className="text-orange-500 hover:text-orange-400 font-bold flex items-center gap-1"
-          >
-            <Activity className="w-3 h-3" /> RECALCULAR
-          </button>
+        <div className="flex flex-col items-end gap-1">
+          <div className="bg-[#141414] border border-[#2A2A2A] px-4 py-2 rounded-sm text-[10px] font-mono text-[#444]">
+            METODOLOGÍA: 60% MOMENTUM + 20% VOL. ADJ. + 20% VOLUMEN
+          </div>
+          <div className="flex items-center gap-2 px-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+            <span className="text-[9px] font-bold text-green-500 uppercase">SYNC: {lastUpdated.toLocaleTimeString()}</span>
+          </div>
         </div>
       </div>
 

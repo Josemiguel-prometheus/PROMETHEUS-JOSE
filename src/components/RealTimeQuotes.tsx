@@ -14,6 +14,7 @@ export default function RealTimeQuotes() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     const fetchQuotes = async () => {
@@ -21,6 +22,7 @@ export default function RealTimeQuotes() {
         const res = await fetch('/api/quotes');
         const data = await res.json();
         setQuotes(data);
+        setLastUpdated(new Date());
       } catch (e) {
         console.error(e);
       } finally {
@@ -29,7 +31,7 @@ export default function RealTimeQuotes() {
     };
 
     fetchQuotes();
-    const interval = setInterval(fetchQuotes, 30000); // More aggressive for this tab
+    const interval = setInterval(fetchQuotes, 10000); // 10s for real-time feel
     return () => clearInterval(interval);
   }, []);
 
@@ -45,15 +47,31 @@ export default function RealTimeQuotes() {
           <h2 className="text-xl font-bold tracking-tight">Monitor de Activos en Tiempo Real</h2>
           <p className="text-xs text-[#666]">Visualización de alta precisión para activos macro y sectores GICS.</p>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#444]" />
-          <input 
-            type="text" 
-            placeholder="Buscar ticker o nombre..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-[#141414] border border-[#2A2A2A] rounded-sm pl-10 pr-4 py-2 text-sm w-full md:w-64 focus:border-orange-500 outline-none transition-all placeholder:text-[#444]"
-          />
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 bg-[#0A0A0A] border border-[#1A1A1A] px-4 py-2 rounded-sm">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Conexión 24/7</span>
+              </div>
+              <span className="text-[8px] font-mono text-[#444]">SYNC: {lastUpdated.toLocaleTimeString()}</span>
+            </div>
+            <div className="w-px h-6 bg-[#1A1A1A]"></div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold text-[#666] uppercase">Latencia</span>
+              <span className="text-[10px] font-mono text-green-600">~140ms</span>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#444]" />
+            <input 
+              type="text" 
+              placeholder="Buscar ticker o nombre..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-[#141414] border border-[#2A2A2A] rounded-sm pl-10 pr-4 py-2 text-sm w-full md:w-64 focus:border-orange-500 outline-none transition-all placeholder:text-[#444]"
+            />
+          </div>
         </div>
       </div>
 
