@@ -238,7 +238,7 @@ elif menu == "Supervisor y Logs":
                 elif val == 'INFO': color = '#1e40af'
                 return f'background-color: {color}; color: white; font-weight: bold; font-family: monospace; font-size: 10px;'
 
-            st.dataframe(df_logs.style.applymap(color_levels, subset=['level']), use_container_width=True, hide_index=True)
+            st.dataframe(df_logs.style.map(color_levels, subset=['level']), use_container_width=True, hide_index=True)
         else:
             st.info("No hay logs registrados en esta sesión.")
     except Exception as e:
