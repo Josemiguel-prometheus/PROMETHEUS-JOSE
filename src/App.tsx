@@ -16,6 +16,7 @@ import { cn } from './lib/utils';
 
 // Sub-components (we will create these next)
 import Dashboard from './components/Dashboard';
+import RotationsPanel from './components/RotationsPanel';
 import RealTimeQuotes from './components/RealTimeQuotes';
 import AgentsPanel from './components/AgentsPanel';
 import SupervisorPanel from './components/SupervisorPanel';
@@ -24,6 +25,7 @@ import ConfigPanel from './components/ConfigPanel';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
+  { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
   { id: 'agents', label: 'Agentes', icon: Users },
   { id: 'supervisor', label: 'Supervisor', icon: ShieldCheck },
@@ -128,6 +130,7 @@ export default function App() {
               className="p-8 max-w-7xl mx-auto"
             >
               {activeTab === 'dashboard' && <Dashboard />}
+              {activeTab === 'rotations' && <RotationsPanel />}
               {activeTab === 'quotes' && <RealTimeQuotes />}
               {activeTab === 'agents' && <AgentsPanel />}
               {activeTab === 'supervisor' && <SupervisorPanel />}

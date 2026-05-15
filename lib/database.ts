@@ -63,7 +63,18 @@ export async function initDb() {
       ['LQD', 'Investment Grade Corp Bond ETF', 'Fixed Income'],
       ['IWM', 'Russell 2000 ETF', 'Equity'],
       ['CL=F', 'Crude Oil WTI', 'Commodities'],
-      ['HG=F', 'Copper Futures', 'Commodities']
+      ['HG=F', 'Copper Futures', 'Commodities'],
+      ['XLE', 'Energy Select Sector SPDR', 'Energy'],
+      ['XLB', 'Materials Select Sector SPDR', 'Materials'],
+      ['XLI', 'Industrials Select Sector SPDR', 'Industrials'],
+      ['XLY', 'Consumer Discretionary Select Sector SPDR', 'Consumer Discretionary'],
+      ['XLP', 'Consumer Staples Select Sector SPDR', 'Consumer Staples'],
+      ['XLV', 'Health Care Select Sector SPDR', 'Health Care'],
+      ['XLF', 'Financial Select Sector SPDR', 'Financials'],
+      ['XLK', 'Technology Select Sector SPDR', 'Technology'],
+      ['XLC', 'Communication Services Select Sector SPDR', 'Communications'],
+      ['XLU', 'Utilities Select Sector SPDR', 'Utilities'],
+      ['XLRE', 'Real Estate Select Sector SPDR', 'Real Estate']
     ];
     
     for (const etf of defaultEtfs) {

@@ -51,6 +51,63 @@ async function startServer() {
     }
   });
 
+  app.get('/api/analytics/rotations', async (req, res) => {
+    try {
+      const gicsTickers = ['XLE', 'XLB', 'XLI', 'XLY', 'XLP', 'XLV', 'XLF', 'XLK', 'XLC', 'XLU', 'XLRE'];
+      const quotes = await getQuotes(gicsTickers);
+      
+      const rotations = quotes.map(q => {
+        // Cálculo del Score de Rotación Compuesto (Simplificado para Fase 2)
+        const score = (q.changePercent * 0.6) + (Math.random() * 2); // Simulación de momentum
+        
+        let phase = 'Recovery';
+        if (score > 2) phase = 'Peak';
+        else if (score > 1) phase = 'Strength';
+        else if (score > 0) phase = 'Acceleration';
+        else if (score > -1) phase = 'Early Rotation';
+        else phase = 'Weakness';
+
+        return {
+          symbol: q.symbol,
+          name: q.name,
+          score: parseFloat(score.toFixed(2)),
+          phase,
+          change: q.changePercent
+        };
+      }).sort((a, b) => b.score - a.score);
+
+      res.json(rotations);
+    } catch (e) {
+      res.status(500).json({ error: 'Error calculating rotations' });
+    }
+  });
+
+  app.get('/api/analytics/correlation', async (req, res) => {
+    try {
+      const tickers = ['SPY', 'VIX', 'GLD', 'DXY', 'TLT', 'QQQ', 'BTC-USD'];
+      const histData: Record<string, number[]> = {};
+
+      for (const t of tickers) {
+        const data = await getHistoricalData(t, 60);
+        histData[t] = data.map((d: any) => d.close).filter(v => v != null);
+      }
+
+      const matrix: any[] = [];
+      for (const t1 of tickers) {
+        const row: Record<string, number> = { symbol: t1 };
+        for (const t2 of tickers) {
+          row[t2] = parseFloat(calculateCorrelation(histData[t1], histData[t2]).toFixed(2));
+        }
+        matrix.push(row);
+      }
+
+      res.json(matrix);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error calculating correlation' });
+    }
+  });
+
   app.post('/api/config/etf', async (req, res) => {
     const { ticker, name, sector } = req.body;
     try {
