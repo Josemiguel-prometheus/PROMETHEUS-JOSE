@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import json
 import time
+import sqlite3
 from lib.database_py import (init_db, log_recommendation, log_system_event, 
                             save_portfolio, log_learning_insight, save_settings_snapshot, get_latest_portfolio)
 from lib.agents_py import (AgenteAnalista, AbogadoDelDiablo, AgenteRecomendador, 
@@ -316,7 +317,6 @@ elif menu == "Supervisor y Madurez":
     st.divider()
     # Logs con Estilo
     st.subheader("Logs de Seguridad y Operación")
-    import sqlite3
     conn = sqlite3.connect('prometheus_intelligence.db')
     df_logs = pd.read_sql_query("SELECT timestamp, level, module, message FROM system_logs ORDER BY timestamp DESC LIMIT 50", conn)
     conn.close()
