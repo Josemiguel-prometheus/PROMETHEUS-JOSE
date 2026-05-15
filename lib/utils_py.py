@@ -41,3 +41,33 @@ def get_rotation_phase(score):
     elif score > 0: return "Early Rotation", "🔵"
     elif score > -2: return "Recovery / Bottoming", "🟡"
     else: return "Weakness / Distribution", "⚪"
+
+def generate_excel_report(history_df, metrics, portfolio_data):
+    import io
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Hoja 1: Historial
+        if not history_df.empty:
+            history_df.to_excel(writer, sheet_name='Historial de Decisiones', index=False)
+        
+        # Hoja 2: Métricas de Performance
+        perf_df = pd.DataFrame([metrics])
+        perf_df.to_excel(writer, sheet_name='Performance Summary', index=False)
+        
+        # Hoja 3: Portafolio Actual
+        if portfolio_data:
+            port_df = pd.DataFrame([portfolio_data])
+            port_df.to_excel(writer, sheet_name='Estado Portafolio', index=False)
+            
+    return output.getvalue()
+
+def calculate_portfolio_performance(portfolio_assets, market_prices, start_prices):
+    # Calcula el retorno de la cartera vs el benchmark
+    portfolio_return = 0
+    for ticker, weight in portfolio_assets.items():
+        if ticker in market_prices and ticker in start_prices:
+            ret = (market_prices[ticker] / start_prices[ticker] - 1)
+            portfolio_return += ret * (float(weight.strip('%')) / 100)
+    
+    spy_return = (market_prices['SPY'] / start_prices['SPY'] - 1)
+    return portfolio_return, spy_return
