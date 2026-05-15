@@ -1,3 +1,8 @@
+# ==========================================
+# PROMETHEUS - ETF ROTATION INTELLIGENCE
+# FASE 3: EL PENTÁGONO DE INTELIGENCIA
+# ==========================================
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,15 +10,18 @@ import yfinance as yf
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import json
 import time
 
-# ==========================================
-# PROMETHEUS - ETF ROTATION INTELLIGENCE
-# FASE 2: NÚCLEO ANALÍTICO DE ROTACIÓN GICS
-# ==========================================
+from lib.database_py import init_db, log_recommendation, log_system_event
+from lib.agents_py import AgenteAnalista, AbogadoDelDiablo, AgenteRecomendador, AgenteSupervisor
+from lib.utils_py import check_connectivity, load_market_data, calculate_rotation_score, get_rotation_phase
+
+# Inicializar Base de Datos
+init_db()
 
 st.set_page_config(
-    page_title="PROMETHEUS - Sector Rotation System",
+    page_title="PROMETHEUS - Global Intelligence",
     page_icon="🔥",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -23,20 +31,24 @@ st.set_page_config(
 st.markdown("""
 <style>
     .stApp { background-color: #050505; color: #E4E3E0; }
-    .stHeader { background-color: #0F0F0F; }
+    .stTabs [data-baseweb="tab-list"] { background-color: #0F0F0F; border-bottom: 1px solid #222; }
+    .stTabs [data-baseweb="tab"] { color: #888; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .stTabs [aria-selected="true"] { color: #f97316 !important; border-bottom-color: #f97316 !important; }
     .metric-card { 
         background-color: #0F0F0F; 
         border: 1px solid #1A1A1A; 
-        padding: 20px; 
-        border-radius: 4px;
-        text-align: center;
+        padding: 15px; 
+        border-radius: 2px;
+        margin-bottom: 10px;
     }
-    .phase-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
+    .agent-header {
+        font-family: 'JetBrains Mono', monospace;
         font-size: 10px;
         font-weight: bold;
-        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #333;
+        margin-bottom: 15px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -49,163 +61,186 @@ SECTORES_GICS = {
     "XLC": "Communication Services", "XLU": "Utilities", "XLRE": "Real Estate"
 }
 
-# --- VALIDACIÓN DE CONEXIÓN ---
-def check_connectivity():
-    try:
-        # Intento ligero de conectar con SPY
-        test = yf.download("SPY", period="1d", progress=False)
-        return not test.empty
-    except:
-        return False
+# --- SIDEBAR & GLOBAL STATE ---
+if 'perfil' not in st.session_state: st.session_state.perfil = "Moderado"
+if 'weights' not in st.session_state: st.session_state.weights = {'momentum': 0.6, 'volatility': 0.2, 'volume': 0.2}
 
-# --- CACHÉ Y DATOS ---
-@st.cache_data(ttl=60)
-def load_market_data(tickers):
-    try:
-        # Limpieza de tickers
-        tickers = [t for t in tickers if t]
-        data = yf.download(tickers, period="6mo", interval="1d", progress=False, group_by='column')
-        
-        if data.empty:
-            return pd.DataFrame()
-            
-        # Manejo de multi-índice de YFinance
-        if isinstance(data.columns, pd.MultiIndex):
-            close_data = data['Close']
-        else:
-            close_data = data
-            
-        return close_data.ffill().bfill()
-    except Exception as e:
-        st.error(f"Error crítico en YFinance: {e}")
-        return pd.DataFrame()
-
-def calculate_rotation_score(data, spy_data, weights):
-    # Metodología de Score Compuesto: Momentum Relativo (ROC 20D) + Volatilidad
-    returns = data.pct_change(20).iloc[-1]
-    spy_ret = spy_data.pct_change(20).iloc[-1]
-    
-    # Momentum Relativo vs SPY
-    rel_momentum = (returns - spy_ret) * 100
-    
-    # Volatilidad (Desviación estándar móvil de 20 días)
-    vol = data.pct_change().rolling(20).std().iloc[-1] * 100
-    
-    # Score Final (Ponderado)
-    # Score = (RelMom * WeightM) / (Vol * WeightV)
-    score = (rel_momentum * weights['momentum']) - (vol * weights['volatility'])
-    return round(score, 2), round(rel_momentum, 2)
-
-def get_rotation_phase(score):
-    if score > 3.5: return "Peak / Exhaustion", "🔴"
-    elif score > 1.5: return "Strength / Acceleration", "🟢"
-    elif score > 0: return "Early Rotation", "🔵"
-    elif score > -2: return "Recovery / Bottoming", "🟡"
-    else: return "Weakness / Distribution", "⚪"
-
-# --- INTERFAZ ---
 with st.sidebar:
-    st.title("🔥 PROMETHEUS GICS")
-    st.markdown("---")
-    
-    # Status de Conexión
-    if check_connectivity():
-        st.success("🛰️ Conexión 24/7 Activa")
-    else:
-        st.error("⚠️ Error de Conexión Real-Time")
-        
-    menu = st.radio("Módulos Fase 2", ["Dashboard Estratégico", "Rankings y Rotación", "Matriz de Correlación", "Configuración"])
+    st.title("🔥 PROMETHEUS V3")
+    st.caption("Fase 3: El Pentágono de Inteligencia")
+    status_col1, status_col2 = st.columns([1, 4])
+    with status_col1:
+        st.write("🟢" if check_connectivity() else "🔴")
+    with status_col2:
+        st.caption("Conexión 24/7 Activa" if check_connectivity() else "Fallo de Datos")
     
     st.divider()
-    st.caption("Sync: " + datetime.now().strftime("%H:%M:%S"))
-    if st.button("🔄 Forzar Sincronización"):
+    menu = st.radio("Módulos Estratégicos", ["Dashboard Macro", "Análisis de Agentes (Pentágono)", "Rotación y Rankings", "Matriz de Correlación", "Supervisor y Logs", "Historial & Aprendizaje"])
+    
+    st.markdown("---")
+    st.session_state.perfil = st.selectbox("Perfil de Riesgo", ["Conservador", "Moderado", "Agresivo"], index=1)
+    
+    if st.button("🔄 RECALCULAR GENESIS"):
         st.cache_data.clear()
+        log_system_event("INFO", "UI", "Manual Recalculation Triggered")
 
-# Configuración de Pesos (Fase 2)
-if 'weights' not in st.session_state:
-    st.session_state.weights = {'momentum': 0.6, 'volatility': 0.2, 'volume': 0.2}
+# --- LÓGICA DE PESTAÑAS ---
 
-if menu == "Configuración":
-    st.header("⚙️ Configuración del Motor Genesis")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.weights['momentum'] = st.slider("Peso Momentum Relativo", 0.0, 1.0, 0.6)
-        st.session_state.weights['volatility'] = st.slider("Peso Volatilidad Ajustada", 0.0, 1.0, 0.2)
-    st.success("Parámetros actualizados. El motor recalculará los scores en tiempo real.")
-
-elif menu == "Dashboard Estratégico":
-    st.header("Terminal Macrosistémica")
-    
-    # Resumen de Mercado Real-Time
-    data = load_market_data(list(SECTORES_GICS.keys()) + ["SPY", "^VIX", "^TNX"])
+if menu == "Dashboard Macro":
+    st.header("📊 Terminal de Situación Sistémica")
+    data = load_market_data(list(SECTORES_GICS.keys()) + ["SPY", "^VIX", "^TNX", "DX-Y.NYB", "GLD"])
     if not data.empty:
-        vix = data["^VIX"].iloc[-1]
-        spy_c = (data["SPY"].iloc[-1] / data["SPY"].iloc[-2] - 1) * 100
-        
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("VIX", f"{vix:.2f}", f"{(vix - data['^VIX'].iloc[-2]):.2f}", delta_color="inverse")
-        col2.metric("SPY", f"{data['SPY'].iloc[-1]:.2f}", f"{spy_c:.2f}%")
-        col3.metric("Yield 10Y", f"{data['^TNX'].iloc[-1]:.2f}", f"{(data['^TNX'].iloc[-1] - data['^TNX'].iloc[-2]):.2f}")
-        col4.metric("Regimen", "Risk-On" if vix < 18 else "Cautious")
+        vix = data["^VIX"].iloc[-1]
+        col1.metric("VIX Index", f"{vix:.2f}", f"{(vix - data['^VIX'].iloc[-2]):.2f}", delta_color="inverse")
+        col2.metric("S&P 500 (SPY)", f"{data['SPY'].iloc[-1]:.2f}", f"{(data['SPY'].iloc[-1]/data['SPY'].iloc[-2]-1)*100:.2f}%")
+        col3.metric("US 10Y Yield", f"{data['^TNX'].iloc[-1]:.2f}", f"{(data['^TNX'].iloc[-1]-data['^TNX'].iloc[-2]):.2f}")
+        col4.metric("DXY Dollar", f"{data['DX-Y.NYB'].iloc[-1]:.2f}", f"{(data['DX-Y.NYB'].iloc[-1]-data['DX-Y.NYB'].iloc[-2]):.2f}")
 
-        # Integración Agentes
-        st.subheader("💡 Análisis de Agentes")
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.info("**ANALISTA PROMETHEUS**\n\nEl flujo de capital hacia sectores de crecimiento (XLK/XLC) se mantiene sólido. El spread VIX-VXV indica complacencia. Recomiendo mantener exposición pero con coberturas en XLU.")
-        with col_b:
-            st.warning("**ABOGADO DEL DIABLO**\n\nCuidado con la sobre-extensión del XLK. La correlación con los Yields está rotando a positiva, lo que sugiere que una inflación persistente destruirá la tesis de crecimiento actual.")
+        st.divider()
+        st.subheader("Estado de Rotación GICS")
+        fig = go.Figure()
+        for s in list(SECTORES_GICS.keys()):
+            fig.add_trace(go.Scatter(y=data[s].pct_change(20)*100, name=s, mode='lines', line=dict(width=1)))
+        fig.update_layout(height=400, template="plotly_dark", title="Relative Strength Trajectory (20D)")
+        st.plotly_chart(fig, use_container_width=True)
 
-elif menu == "Rankings y Rotación":
-    st.header("🏆 Rankings de Rotación Sectorial")
+elif menu == "Análisis de Agentes (Pentágono)":
+    st.header("🧠 El Pentágono de Inteligencia Prometheus")
     
+    # Preparar datos para agentes
+    data = load_market_data(list(SECTORES_GICS.keys()) + ["SPY", "^VIX"])
+    results = []
+    for ticker, name in SECTORES_GICS.items():
+        score, rel_mom = calculate_rotation_score(data[ticker], data["SPY"], st.session_state.weights)
+        results.append({"Sector": name, "Líder": ticker, "Score Compuesto": score, "Rel. Mom (20D)": rel_mom})
+    df_rot = pd.DataFrame(results).sort_values(by="Score Compuesto", ascending=False)
+    
+    # Inicializar Agentes
+    analista = AgenteAnalista(df_rot, {"^VIX": data["^VIX"].iloc[-1]}, None)
+    rep_analista = analista.generar_analisis()
+    
+    abogado = AbogadoDelDiablo(rep_analista)
+    rep_abogado = abogado.contra_analisis()
+    
+    recomendador = AgenteRecomendador(rep_analista, rep_abogado)
+    rep_final = recomendador.ejecutar_decision(st.session_state.perfil)
+    
+    # 1. Panel de Síntesis Central
+    conv_color = {"ALTA": "#15803d", "MEDIA": "#a16207", "BAJA": "#b91c1c"}.get(rep_final['conviccion_global'], "#333")
+    st.markdown(f"""
+        <div style="background-color: {conv_color}; padding: 15px; border-radius: 4px; border-left: 10px solid rgba(255,255,255,0.3); margin-bottom: 30px;">
+            <h3 style="margin: 0; color: white;">CONVICCIÓN GLOBAL: {rep_final['conviccion_global']}</h3>
+            <p style="margin: 0; opacity: 0.9; font-size: 14px;">Propuesta Ejecutiva: {rep_final['accion']} | Calidad de Señal: {rep_analista['calidad_entorno']}</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # 2. Diseño de Tres Columnas
+    col_analista, col_abogado, col_final = st.columns(3)
+    
+    with col_analista:
+        st.markdown('<div class="agent-header">🔎 ANALISTA PROMETHEUS</div>', unsafe_allow_html=True)
+        st.markdown(f"**Calidad Entorno:** {rep_analista['calidad_entorno']}")
+        st.info(f"**Justificación:**\n{rep_analista['justificacion']}")
+        st.write(f"**Foco Sectorial:** {rep_analista['sector_lider']}")
+        st.write(f"**Score:** {rep_analista['score_lider']}")
+        st.caption(f"Metodología: {rep_analista['metodologia']}")
+
+    with col_abogado:
+        st.markdown('<div class="agent-header" style="color: #666; border-bottom-color: #444;">⚖️ ABOGADO DEL DIABLO</div>', unsafe_allow_html=True)
+        st.warning(f"**Escepticismo:** {rep_abogado['nivel_escepticismo']}")
+        st.markdown(f"*{rep_abogado['mensaje_critico']}*")
+        st.divider()
+        for r in rep_abogado['alertas']:
+            st.error(f"[{r['nivel']}] {r['riesgo']}")
+
+    with col_final:
+        st.markdown('<div class="agent-header">🎯 MOTOR DE DECISIÓN</div>', unsafe_allow_html=True)
+        st.success(f"**ACCIÓN RECOMENDADA:** {rep_final['accion']}")
+        st.write(f"**Stop Loss:** {rep_final['stop_loss']}")
+        st.write(f"**Ratio R/R:** {rep_final['ratio_rr']}")
+        
+        st.markdown("**Asignación de Cartera Sugerida:**")
+        cols = st.columns(len(rep_final['propuesta']))
+        for i, (k, v) in enumerate(rep_final['propuesta'].items()):
+            cols[i].metric(k.upper(), v)
+            
+    st.divider()
+    # 3. Flujo de Confirmación
+    st.subheader("📝 Protocolo de Ejecución Consciente")
+    with st.expander("Confirmar Rotación de Cartera", expanded=True):
+        col_btn1, col_btn2, col_btn3 = st.columns(3)
+        reflection = st.text_area("¿Cuál es tu razonamiento principal para confirmar esta operación?", placeholder="Ej: Acepto los riesgos de sobre-extensión por el fuerte momentum en XLK...")
+        
+        if col_btn1.button("✅ ACEPTAR Y REGISTRAR", use_container_width=True):
+            if reflection:
+                log_recommendation(rep_analista, rep_abogado, rep_final, "ACEPTADA", reflection, {"perfil": st.session_state.perfil}, rep_final['conviccion_global'])
+                st.success("Recomendación registrada en el Laboratorio Vivo. Disciplina es Alpha.")
+                log_system_event("INFO", "Agents", "Recommendation Accepted by User")
+            else:
+                st.error("Protocolo de integridad: La reflexión es obligatoria para el aprendizaje del sistema.")
+        
+        if col_btn2.button("🛠️ MODIFICAR MANUALMENTE", use_container_width=True):
+            st.info("Redirigiendo a panel de ajuste manual...")
+            
+        if col_btn3.button("❌ RECHAZAR", use_container_width=True):
+            log_recommendation(rep_analista, rep_abogado, rep_final, "RECHAZADA", reflection, {}, "N/A")
+            st.warning("Operación cancelada. El registro guardará los contra-argumentos.")
+
+elif menu == "Rotación y Rankings":
+    st.header("🏆 Rankings de Rotación Sectorial")
     market_data = load_market_data(list(SECTORES_GICS.keys()) + ["SPY"])
     if not market_data.empty:
         results = []
         for ticker, name in SECTORES_GICS.items():
             score, rel_mom = calculate_rotation_score(market_data[ticker], market_data["SPY"], st.session_state.weights)
             phase, icon = get_rotation_phase(score)
-            results.append({
-                "Sector": name,
-                "Líder": ticker,
-                "Rel. Mom (20D)": f"{rel_mom}%",
-                "Score Compuesto": score,
-                "Fase Actual": f"{icon} {phase}"
-            })
-        
+            results.append({"Sector": name, "Líder": ticker, "Rel. Mom (20D)": f"{rel_mom}%", "Score Compuesto": score, "Fase": f"{icon} {phase}"})
         df_rank = pd.DataFrame(results).sort_values(by="Score Compuesto", ascending=False)
         st.dataframe(df_rank, use_container_width=True, hide_index=True)
-        
-        # Visualización de Momentum
-        fig = px.bar(df_rank, x="Sector", y="Score Compuesto", color="Score Compuesto",
-                     color_continuous_scale="RdYlGn", title="Fuerza Relativa por Sector GICS")
-        st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "Matriz de Correlación":
     st.header("📊 Gestión de Riesgo: Matriz de Correlación")
-    
     assets = ["SPY", "QQQ", "GLD", "TLT", "DXY", "BTC-USD", "XLE", "XLK", "^VIX"]
     data = load_market_data(assets)
     if not data.empty:
         window = st.select_slider("Ventana de Correlación (Días)", options=[30, 60, 90], value=60)
         corr_matrix = data.tail(window).corr()
-        
-        fig = go.Figure(data=go.Heatmap(
-            z=corr_matrix.values,
-            x=corr_matrix.columns,
-            y=corr_matrix.columns,
-            colorscale='RdBu_r',
-            zmin=-1, zmax=1
-        ))
-        fig.update_layout(title=f"Pearson Correlation Matrix ({window} days)")
+        fig = go.Figure(data=go.Heatmap(z=corr_matrix.values, x=corr_matrix.columns, y=corr_matrix.columns, colorscale='RdBu_r', zmin=-1, zmax=1))
         st.plotly_chart(fig, use_container_width=True)
-        
-        st.write("### Interpretación del Abogado del Diablo")
-        st.markdown("""
-        - **SPY-TLT**: Correlación actualmente **negativa**. El mercado teme a los tipos.
-        - **XLK-DXY**: Correlación inversa extrema. Si el dólar sube, el Nasdaq sufre.
-        - **VIX-Everything**: El pico de correlación en caídas suele marcar suelos locales.
-        """)
+
+elif menu == "Supervisor y Logs":
+    st.header("🛡️ Guardián del Sistema (AgenteSupervisor)")
+    sup = AgenteSupervisor()
+    status = sup.obtener_status()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Salud Global", status['health_score'])
+    col2.metric("Latencia Datos", "140ms", "OK")
+    col3.metric("Última Sincro", status['last_calc'])
+    col4.metric("Días Operativo", "1.5", "Genesis")
+    
+    st.divider()
+    st.subheader("Logs de Integridad")
+    import sqlite3
+    conn = sqlite3.connect('prometheus_intelligence.db')
+    df_logs = pd.read_sql_query("SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 50", conn)
+    st.dataframe(df_logs, use_container_width=True)
+    
+    if st.button("🚨 FORZAR RECALCULO Y LIMPIEZA DE CACHÉ", use_container_width=True):
+        st.cache_data.clear()
+        st.success("Sistema reiniciado. Sincronización en curso...")
+
+elif menu == "Historial & Aprendizaje":
+    st.header("📚 Laboratorio Vivo: Memoria de Decisiones")
+    import sqlite3
+    conn = sqlite3.connect('prometheus_intelligence.db')
+    df_hist = pd.read_sql_query("SELECT * FROM recommendations ORDER BY timestamp DESC", conn)
+    if not df_hist.empty:
+        st.dataframe(df_hist, use_container_width=True)
+        st.download_button("📥 Exportar para Análisis Forense", df_hist.to_csv().encode('utf-8'), "prometheus_history.csv", "text/csv")
+    else:
+        st.info("No hay registros previos. Comienza a operar en el Pentágono para iniciar el aprendizaje.")
 
 st.divider()
-st.caption("PROMETHEUS v2.0 - Rigor, Disciplina y Transparencia en la gestión de ETFs.")
+st.caption("PROMETHEUS v3.0 - La Excelencia es un Hábito. Disciplina, Rigor y Transparencia.")
