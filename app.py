@@ -123,16 +123,35 @@ if menu == "Dashboard Estratégico":
         st.divider()
         cola, colb = st.columns([2, 1])
         with cola:
-            st.subheader("Mapa de Rotación Sectorial (Heatmap 20D)")
+            st.subheader("Mapa de Rotación Sectorial (Rendimiento Relativo 20D)")
             # Calcular rendimientos relativos
             returns = data_macro[list(SECTORES_GICS.keys())].pct_change(20).iloc[-1] * 100
             spy_ret = data_macro["SPY"].pct_change(20).iloc[-1] * 100
-            rel_returns = returns - spy_ret
+            rel_returns = (returns - spy_ret).sort_values()
             
-            fig = px.bar(rel_returns.sort_values(), orientation='h', 
-                         color=rel_returns.sort_values(), color_continuous_scale='RdYlGn',
-                         labels={'value': 'Exc. Retorno vs SPY (%)', 'index': 'Sector'})
-            fig.update_layout(template="plotly_dark", height=400, showlegend=False)
+            # Crear un DataFrame para Plotly con nombres amigables
+            df_plot = pd.DataFrame({
+                'Sector': [SECTORES_GICS.get(ticker, ticker) for ticker in rel_returns.index],
+                'Exc. Retorno vs SPY (%)': rel_returns.values,
+                'Ticker': rel_returns.index
+            })
+
+            fig = px.bar(df_plot, x='Exc. Retorno vs SPY (%)', y='Sector', 
+                         orientation='h', 
+                         color='Exc. Retorno vs SPY (%)', 
+                         color_continuous_scale='RdYlGn',
+                         text='Exc. Retorno vs SPY (%)')
+            
+            fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+            fig.update_layout(
+                template="plotly_dark", 
+                height=500, 
+                showlegend=False,
+                xaxis_title="Alpha vs SPY (%)",
+                yaxis_title="",
+                margin=dict(l=20, r=20, t=10, b=10),
+                coloraxis_showscale=False
+            )
             st.plotly_chart(fig, use_container_width=True)
             
         with colb:
