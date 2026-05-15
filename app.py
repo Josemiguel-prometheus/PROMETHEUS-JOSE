@@ -19,6 +19,7 @@ from lib.utils_py import check_connectivity, load_market_data, calculate_rotatio
 
 # Inicializar Base de Datos
 init_db()
+log_system_event("INFO", "System", "Prometheus Core v3.0 Inicializado - Boot OK")
 
 st.set_page_config(
     page_title="PROMETHEUS - Global Intelligence",
@@ -223,9 +224,25 @@ elif menu == "Supervisor y Logs":
     st.divider()
     st.subheader("Logs de Integridad")
     import sqlite3
-    conn = sqlite3.connect('prometheus_intelligence.db')
-    df_logs = pd.read_sql_query("SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 50", conn)
-    st.dataframe(df_logs, use_container_width=True)
+    try:
+        conn = sqlite3.connect('prometheus_intelligence.db')
+        df_logs = pd.read_sql_query("SELECT timestamp, level, module, message FROM system_logs ORDER BY timestamp DESC LIMIT 50", conn)
+        conn.close()
+        
+        if not df_logs.empty:
+            # Colores para los niveles de log
+            def color_levels(val):
+                color = '#333'
+                if val == 'ERROR': color = '#991b1b'
+                elif val == 'WARNING': color = '#92400e'
+                elif val == 'INFO': color = '#1e40af'
+                return f'background-color: {color}; color: white; font-weight: bold; font-family: monospace; font-size: 10px;'
+
+            st.dataframe(df_logs.style.applymap(color_levels, subset=['level']), use_container_width=True, hide_index=True)
+        else:
+            st.info("No hay logs registrados en esta sesión.")
+    except Exception as e:
+        st.error(f"Error al consultar logs: {e}")
     
     if st.button("🚨 FORZAR RECALCULO Y LIMPIEZA DE CACHÉ", use_container_width=True):
         st.cache_data.clear()

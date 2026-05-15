@@ -15,7 +15,9 @@ def load_market_data(tickers):
         data = yf.download(tickers, period="6mo", interval="1d", progress=False, group_by='column')
         if data.empty: return pd.DataFrame()
         close_data = data['Close'] if isinstance(data.columns, pd.MultiIndex) else data
-        return close_data.ffill().bfill()
+        df = close_data.ffill().bfill()
+        log_system_event("INFO", "DataFetcher", f"Sincronización exitosa: {len(tickers)} activos cargados.")
+        return df
     except Exception as e:
         log_system_event("ERROR", "DataFetcher", str(e))
         return pd.DataFrame()
