@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 from lib.database_py import log_system_event
+import time
 
 def check_connectivity():
     try:
@@ -9,31 +10,56 @@ def check_connectivity():
     except:
         return False
 
-def load_market_data(tickers):
-    try:
-        tickers = [t for t in tickers if t]
-        data = yf.download(tickers, period="6mo", interval="1d", progress=False, group_by='column')
-        if data.empty: return pd.DataFrame()
-        close_data = data['Close'] if isinstance(data.columns, pd.MultiIndex) else data
-        df = close_data.ffill().bfill()
-        log_system_event("INFO", "DataFetcher", f"Sincronización exitosa: {len(tickers)} activos cargados.")
-        return df
-    except Exception as e:
-        log_system_event("ERROR", "DataFetcher", str(e))
-        return pd.DataFrame()
+def load_market_data(tickers, safe_mode=False):
+    """
+    Carga datos con lógica de reintentos y soporte para Modo Seguro.
+    Safe Mode reduce el periodo de carga para maximizar estabilidad.
+    """
+    period = "3mo" if safe_mode else "6mo"
+    retries = 3
+    
+    for attempt in range(retries):
+        try:
+            tickers = [t for t in tickers if t]
+            # yfinance a veces falla con muchos tickers, intentamos por partes si es necesario
+            data = yf.download(tickers, period=period, interval="1d", progress=False, group_by='column')
+            
+            if data.empty:
+                if attempt < retries - 1:
+                    time.sleep(2)
+                    continue
+                return pd.DataFrame()
+            
+            close_data = data['Close'] if isinstance(data.columns, pd.MultiIndex) else data
+            df = close_data.ffill().bfill()
+            
+            log_system_event("INFO", "DataFetcher", 
+                             f"Sincronización exitosa ({'Safe' if safe_mode else 'Full'}): {len(tickers)} activos.")
+            return df
+            
+        except Exception as e:
+            log_system_event("WARNING", "DataFetcher", f"Intento {attempt+1} fallido: {str(e)}")
+            if attempt < retries - 1:
+                time.sleep(2)
+            else:
+                log_system_event("ERROR", "DataFetcher", f"Fallo definitivo carga datos: {str(e)}")
+                return pd.DataFrame()
 
 def calculate_rotation_score(data, spy_data, weights):
     # Momentum Relativo (ROC 20)
-    returns = data.pct_change(20).iloc[-1]
-    spy_ret = spy_data.pct_change(20).iloc[-1]
-    rel_momentum = (returns - spy_ret) * 100
-    
-    # Volatilidad (20D)
-    vol = data.pct_change().rolling(20).std().iloc[-1] * 100
-    
-    # Score Compuesto
-    score = (rel_momentum * weights.get('momentum', 0.6)) - (vol * weights.get('volatility', 0.2))
-    return round(score, 2), round(rel_momentum, 2)
+    try:
+        returns = data.pct_change(20).iloc[-1]
+        spy_ret = spy_data.pct_change(20).iloc[-1]
+        rel_momentum = (returns - spy_ret) * 100
+        
+        # Volatilidad (20D)
+        vol = data.pct_change().rolling(20).std().iloc[-1] * 100
+        
+        # Score Compuesto
+        score = (rel_momentum * weights.get('momentum', 0.6)) - (vol * weights.get('volatility', 0.2))
+        return round(score, 2), round(rel_momentum, 2)
+    except:
+        return 0.0, 0.0
 
 def get_rotation_phase(score):
     if score > 3.5: return "Peak / Exhaustion", "🔴"
