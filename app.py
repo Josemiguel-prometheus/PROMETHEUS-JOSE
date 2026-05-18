@@ -3,27 +3,25 @@
 # FASE 5: CONSOLIDACIÓN GENESIS (PRO)
 # ==========================================
 
+import sqlite3
+import json
+import time
+from datetime import datetime, timedelta
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import json
-import time
-import sqlite3
-from lib.database_py import (init_db, log_recommendation, log_system_event, 
-                            save_portfolio, log_learning_insight, save_settings_snapshot, 
-                            get_latest_portfolio, backup_database)
-from lib.agents_py import (AgenteAnalista, AbogadoDelDiablo, AgenteRecomendador, 
-                           AgenteSupervisor, ContinuousLearningEngine, AgenteMentor)
-from lib.utils_py import (check_connectivity, load_market_data, calculate_rotation_score, 
-                          get_rotation_phase, generate_excel_report, calculate_portfolio_performance)
+
+import lib.database_py as db_lib
+import lib.agents_py as agents_lib
+import lib.utils_py as utils_lib
 
 # Inicializar Base de Datos
-init_db()
-log_system_event("INFO", "System", "Prometheus Core v5.0 - Consolidación Genesis Activa")
+db_lib.init_db()
+db_lib.log_system_event("INFO", "System", "Prometheus Core v5.0 - Consolidación Genesis Activa")
 
 st.set_page_config(
     page_title="PROMETHEUS - Bloomberg Intelligence",
@@ -126,14 +124,14 @@ with st.sidebar:
     
     if st.button("🔄 REBOOT SISTEMA", use_container_width=True):
         st.cache_data.clear()
-        backup_database()
-        log_system_event("INFO", "UI", "Resync y Backup activado.")
+        db_lib.backup_database()
+        db_lib.log_system_event("INFO", "UI", "Resync y Backup activado.")
         st.rerun()
 
 # --- CARarga de DATOS GLOBAL ---
 @st.cache_data(ttl=600)
 def get_global_data(tickers, safe_mode):
-    return load_market_data(tickers, safe_mode=safe_mode)
+    return utils_lib.load_market_data(tickers, safe_mode=safe_mode)
 
 # --- LÓGICA DE PESTAÑAS ---
 
@@ -156,7 +154,7 @@ if menu == "Dashboard Estratégico":
         # Insights del Mentor
         conn = sqlite3.connect('prometheus_intelligence.db')
         df_hist = pd.read_sql_query("SELECT * FROM recommendations", conn)
-        mentor = AgenteMentor(df_hist)
+        mentor = agents_lib.AgenteMentor(df_hist)
         behavior = mentor.analyze_user_behavior()
         conn.close()
 
@@ -226,16 +224,16 @@ elif menu == "Pentágono de Agentes":
     if not data.empty:
         results = []
         for ticker, name in SECTORES_GICS.items():
-            score, rel_mom = calculate_rotation_score(data[ticker], data["SPY"], st.session_state.weights)
+            score, rel_mom = utils_lib.calculate_rotation_score(data[ticker], data["SPY"], st.session_state.weights)
             results.append({"Sector": name, "Líder": ticker, "Score Compuesto": score, "Rel. Mom (20D)": rel_mom})
         df_rot = pd.DataFrame(results).sort_values(by="Score Compuesto", ascending=False)
         
         # Agentes
-        analista = AgenteAnalista(df_rot, {"^VIX": data["^VIX"].iloc[-1]}, None)
+        analista = agents_lib.AgenteAnalista(df_rot, {"^VIX": data["^VIX"].iloc[-1]}, None)
         rep_analista = analista.generar_analisis()
-        abogado = AbogadoDelDiablo(rep_analista)
+        abogado = agents_lib.AbogadoDelDiablo(rep_analista)
         rep_abogado = abogado.contra_analisis()
-        recomendador = AgenteRecomendador(rep_analista, rep_abogado)
+        recomendador = agents_lib.AgenteRecomendador(rep_analista, rep_abogado)
         rep_final = recomendador.ejecutar_decision(st.session_state.perfil)
         
         # UI Agentes Consolidada
@@ -275,18 +273,18 @@ elif menu == "Pentágono de Agentes":
             c1, c2 = st.columns(2)
             if c1.button("✅ EJECUTAR PLAN", use_container_width=True):
                 if reflexion:
-                    log_recommendation(rep_analista, rep_abogado, rep_final, "ACEPTADA", reflexion, {"VIX": data["^VIX"].iloc[-1], "Safe": st.session_state.safe_mode}, rep_final['conviccion_global'])
+                    db_lib.log_recommendation(rep_analista, rep_abogado, rep_final, "ACEPTADA", reflexion, {"VIX": data["^VIX"].iloc[-1], "Safe": st.session_state.safe_mode}, rep_final['conviccion_global'])
                     st.success("Operación registrada. La disciplina es el fundamento del Alpha.")
                 else: st.error("Protocolo Genesis: Se requiere reflexión escrita para alimentar el aprendizaje.")
             
             if c2.button("❌ DESESTIMAR SEÑAL", use_container_width=True):
-                log_recommendation(rep_analista, rep_abogado, rep_final, "RECHAZADA", reflexion, {}, "N/A")
+                db_lib.log_recommendation(rep_analista, rep_abogado, rep_final, "RECHAZADA", reflexion, {}, "N/A")
                 st.warning("Señal desestimada. Registrado para análisis forense.")
 
 elif menu == "Mi Portafolio":
     st.markdown('<div class="bloomberg-header">CENTRO DE GESTIÓN DE ACTIVOS</div>', unsafe_allow_html=True)
     
-    current_p = get_latest_portfolio()
+    current_p = db_lib.get_latest_portfolio()
     
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -305,7 +303,7 @@ elif menu == "Mi Portafolio":
             if st.form_submit_button("📁 MEMORIZAR PORTAFOLIO"):
                 with st.spinner("Actualizando Benchmarks..."):
                     data_spy = get_global_data(["SPY"], True)
-                    save_portfolio(weights_input, total_v, data_spy['SPY'].iloc[-1])
+                    db_lib.save_portfolio(weights_input, total_v, data_spy['SPY'].iloc[-1])
                     st.success("Cartera consolidada en base de datos.")
 
     with col2:
@@ -354,7 +352,7 @@ elif menu == "Historial & Aprendizaje":
         st.divider()
         col_exp1, col_exp2 = st.columns(2)
         if col_exp1.button("📊 EXPORTAR DOSSIER BLOOMBERG (EXCEL)", use_container_width=True):
-            excel_data = generate_excel_report(df_hist, {"Accuracy": "75%", "Decisions": len(df_hist)}, get_latest_portfolio())
+            excel_data = utils_lib.generate_excel_report(df_hist, {"Accuracy": "75%", "Decisions": len(df_hist)}, db_lib.get_latest_portfolio())
             st.download_button("📥 Descargar Reporte", excel_data, f"Prometheus_Report_{datetime.now().strftime('%Y%m%d')}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         
     with tab_stats:
@@ -370,7 +368,7 @@ elif menu == "Historial & Aprendizaje":
         st.line_chart(evo_df.set_index("Iteración"))
 
     with tab_evo:
-        engine = ContinuousLearningEngine()
+        engine = agents_lib.ContinuousLearningEngine()
         lea = engine.analyze_accuracy()
         opti = engine.suggest_optimizations(st.session_state.weights)
         
@@ -389,14 +387,14 @@ elif menu == "Historial & Aprendizaje":
             st.info(opti['sugerencia'])
             st.write(f"*Impacto:* {opti['impacto_estimado']}")
             if st.button("Sincronizar Pesos Neuronales", use_container_width=True):
-                log_learning_insight("SYSTEM", opti['sugerencia'], "MEDIUM", True)
+                db_lib.log_learning_insight("SYSTEM", opti['sugerencia'], "MEDIUM", True)
                 st.success("Sistema calibrado satisfactoriamente.")
             st.markdown('</div>', unsafe_allow_html=True)
 
 elif menu == "Control & Salud":
     st.markdown('<div class="bloomberg-header">CENTRO DE MANTENIMIENTO Y SUPERVISIÓN</div>', unsafe_allow_html=True)
     
-    sup = AgenteSupervisor()
+    sup = agents_lib.AgenteSupervisor()
     status = sup.obtener_status(st.session_state.safe_mode)
     
     col_s1, col_s2, col_s3, col_s4 = st.columns(4)
@@ -421,7 +419,7 @@ elif menu == "Control & Salud":
     col_b1, col_b2 = st.columns(2)
     with col_b1:
         if st.button("📦 EJECUTAR DATABASE BACKUP", use_container_width=True):
-            if backup_database(): st.success("Backup Genesis guardado exitosamente.")
+            if db_lib.backup_database(): st.success("Backup Genesis guardado exitosamente.")
     with col_b2:
         if st.button("🧹 PURGAR CACHÉ DE TERMINAL", use_container_width=True):
             st.cache_data.clear()
@@ -465,4 +463,4 @@ elif menu == "Guía y Esencia":
         st.info("💡 **Consejo Genesis:** En mercados laterales o de alta volatilidad (VIX > 25), la mejor operación suele ser la que no se hace. El cash es una posición estratégica.")
 
 st.divider()
-st.caption(f"PROMETHEUS v5.0.0-GENESIS | {datetime.now().year} | Estabilidad • Rigor • Alpha. | Conexión: {'🔴 OFF' if not check_connectivity() else '🟢 ON'}")
+st.caption(f"PROMETHEUS v5.0.0-GENESIS | {datetime.now().year} | Estabilidad • Rigor • Alpha. | Conexión: {'🔴 OFF' if not utils_lib.check_connectivity() else '🟢 ON'}")

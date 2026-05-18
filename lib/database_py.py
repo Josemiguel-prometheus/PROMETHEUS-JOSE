@@ -12,7 +12,7 @@ def get_db_connection():
         conn = sqlite3.connect(DB_PATH)
         return conn
     except Exception as e:
-        log_system_event("CRITICAL", "Database", f"Error de conexión: {str(e)}")
+        print(f"CRITICAL: Database connection error: {str(e)}")
         return None
 
 def init_db():
