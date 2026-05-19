@@ -30,8 +30,12 @@ def load_market_data(tickers, safe_mode=False):
                     continue
                 return pd.DataFrame()
             
-            close_data = data['Close'] if isinstance(data.columns, pd.MultiIndex) else data
-            df = close_data.ffill().bfill()
+            if isinstance(data.columns, pd.MultiIndex):
+                df = data['Close'].ffill().bfill()
+            else:
+                # Single ticker handling
+                df = data[['Close']].ffill().bfill()
+                df.columns = tickers
             
             log_system_event("INFO", "DataFetcher", 
                              f"Sincronización exitosa ({'Safe' if safe_mode else 'Full'}): {len(tickers)} activos.")
@@ -89,6 +93,7 @@ def generate_excel_report(history_df, metrics, portfolio_data):
 
 def calculate_portfolio_performance(portfolio_assets, market_prices, start_prices):
     # Calcula el retorno de la cartera vs el benchmark
+    portfolio_return = 0.0
     def get_val(v):
         if isinstance(v, dict): return float(str(v.get('weight', '0')).strip('%'))
         return float(str(v).strip('%'))

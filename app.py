@@ -282,162 +282,232 @@ elif menu == "Pentágono de Agentes":
                 st.warning("Señal desestimada. Registrado para análisis forense.")
 
 elif menu == "Mi Portafolio":
-    st.markdown('<div class="bloomberg-header">CENTRO DE GESTIÓN DE ACTIVOS INSTITUCIONAL</div>', unsafe_allow_html=True)
+    st.markdown('<div class="bloomberg-header">TERMINAL DE GESTIÓN DE ACTIVOS (PRO)</div>', unsafe_allow_html=True)
     
     current_p = db_lib.get_latest_portfolio()
     
-    tab_p1, tab_p2, tab_p3 = st.tabs(["⚙️ Cartera y Activos", "📊 Análisis Táctico", "⚖️ Asesor de Rebalanceo"])
+    tab_p1, tab_p2, tab_p3, tab_p4 = st.tabs(["🚀 Dashboard", "⚙️ Configuración", "📊 Riesgo & Alpha", "⚖️ Rebalanceador"])
     
+    # Cargar datos de mercado para el portafolio
+    if current_p and current_p['assets']:
+        with st.spinner("Sincronizando precios en tiempo real..."):
+            all_portfolio_tickers = list(current_p['assets'].keys()) + ["SPY", "^VIX"]
+            px_port = get_global_data(all_portfolio_tickers, st.session_state.safe_mode)
+    else:
+        px_port = pd.DataFrame()
+
     with tab_p1:
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            st.subheader("Configuración de Activos")
-            # Cargar recomendación más reciente
+        if current_p:
+            # Fila Superior: Métricas Clave
+            m1, m2, m3, m4 = st.columns(4)
+            total_net = current_p['total_value'] + current_p.get('cash', 0.0)
+            
+            # Calcular Retorno Histórico vs Benchmark (Simulado si no hay más datos)
+            if not px_port.empty:
+                prices_start = px_port.iloc[0]
+                prices_end = px_port.iloc[-1]
+                p_ret, s_ret = utils_lib.calculate_portfolio_performance(current_p['assets'], prices_end, prices_start)
+                alpha = p_ret - s_ret
+            else:
+                p_ret, s_ret, alpha = 0, 0, 0
+
+            m1.metric("Valor Total (NAV)", f"${total_net:,.2f}", f"{p_ret*100:.2f}%")
+            m2.metric("Market Value", f"${current_p['total_value']:,.2f}")
+            m3.metric("Cash Balance", f"${current_p.get('cash', 0.0):,.2f}")
+            m4.metric("Alpha vs SPY", f"{alpha*100:.2f}%", delta_color="normal")
+
+            st.divider()
+            
+            col_l, col_r = st.columns([1, 1])
+            with col_l:
+                st.subheader("Diversificación Sectorial")
+                assets_data = current_p['assets']
+                labels = list(assets_data.keys()) + ["CASH"]
+                weights = []
+                for v in assets_data.values():
+                    if isinstance(v, dict): weights.append(float(str(v.get('weight', '0')).strip('%')))
+                    else: weights.append(float(str(v).strip('%')))
+                
+                spent_w = sum(weights)
+                cash_w = 100 - spent_w if spent_w < 100 else 0
+                weights.append(cash_w)
+                
+                fig = px.pie(names=labels, values=weights, hole=0.5, 
+                             color_discrete_sequence=px.colors.sequential.Oranges_r)
+                fig.update_layout(template="plotly_dark", showlegend=True, margin=dict(t=10, b=10, l=10, r=10), height=350)
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col_r:
+                st.subheader("Performance vs SPY (Base 100)")
+                if not px_port.empty:
+                    # Crear índice de rendimiento acumulado
+                    weights_dict = {}
+                    for t, v in current_p['assets'].items():
+                        if isinstance(v, dict): weights_dict[t] = float(str(v.get('weight', '0')).strip('%'))/100
+                        else: weights_dict[t] = float(str(v).strip('%'))/100
+                    
+                    # Normalizar precios
+                    norm_px = px_port / px_port.iloc[0] * 100
+                    
+                    # Cartera (weighted sum)
+                    port_index = pd.Series(0, index=norm_px.index)
+                    for t, w in weights_dict.items():
+                        if t in norm_px.columns:
+                            port_index += norm_px[t] * w
+                    
+                    # Add cash component (stable at 100)
+                    port_index += (1 - sum(weights_dict.values())) * 100
+
+                    fig_perf = go.Figure()
+                    fig_perf.add_trace(go.Scatter(x=port_index.index, y=port_index, name='Mi Cartera', line=dict(color='#f97316', width=3)))
+                    fig_perf.add_trace(go.Scatter(x=norm_px.index, y=norm_px['SPY'], name='S&P 500', line=dict(color='#888', dash='dot')))
+                    fig_perf.update_layout(template="plotly_dark", height=350, margin=dict(t=10, b=10, l=10, r=10),
+                                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    st.plotly_chart(fig_perf, use_container_width=True)
+                else:
+                    st.info("Sin datos de mercado suficientes para graficar.")
+        else:
+            st.info("Configura tu cartera en la pestaña 'Configuración' para comenzar.")
+
+    with tab_p2:
+        col_c1, col_c2 = st.columns([1, 1])
+        with col_c1:
+            st.subheader("Inventario de Activos")
+            with st.form("portfolio_form_v6"):
+                # Lista expandida de sugerencias
+                frequent = ["SPY", "QQQ", "DIA", "IWM", "XLF", "XLK", "XLE", "VTI", "TLT", "GLD", "BITO", "TSLA", "NVDA", "AAPL", "MSFT"]
+                current_tickers = list(current_p['assets'].keys()) if current_p else ["SPY"]
+                
+                selected = st.multiselect("Sectores y ETFs Destacados", frequent, 
+                                          default=[t for t in current_tickers if t in frequent])
+                
+                manual = st.text_input("Añadir otros Tickers (ej: META, BTC-USD, ETH-USD)", 
+                                       ", ".join([t for t in current_tickers if t not in frequent]))
+                
+                all_t = list(set(selected + [t.strip().upper() for t in manual.split(",") if t.strip()]))
+                
+                st.divider()
+                cash_input = st.number_input("💵 Cash en Cuenta (USD)", value=current_p.get('cash', 0.0) if current_p else 10000.0)
+                inv_input = st.number_input("💰 Valor Invertido Estimado (USD)", value=current_p['total_value'] if current_p else 90000.0)
+                
+                st.write("**Asignación de Pesos Actual (%)**")
+                new_weights = {}
+                for t in all_t:
+                    prev = current_p['assets'].get(t, '0') if current_p else '0'
+                    def_w = int(prev.get('weight', '0').strip('%')) if isinstance(prev, dict) else int(str(prev).strip('%'))
+                    new_weights[t] = f"{st.slider(f'{t}', 0, 100, def_w)}%"
+                
+                total_w = sum([int(v.strip('%')) for v in new_weights.values()])
+                if total_w > 100:
+                    st.error(f"Error: La asignación total es {total_w}%. El máximo permitido es 100%.")
+                
+                if st.form_submit_button("🗄️ CONSOLIDAR CARTERA"):
+                    with st.spinner("Sincronizando con Base de Datos..."):
+                        spy_data = get_global_data(["SPY"], True)
+                        db_lib.save_portfolio(new_weights, inv_input, cash_input, spy_data['SPY'].iloc[-1])
+                        st.success("Configuración guardada.")
+                        st.rerun()
+
+        with col_c2:
+            st.subheader("Auditoría de Posiciones")
+            if current_p:
+                rows = []
+                for t, w in current_p['assets'].items():
+                    weight_val = float(str(w.get('weight', '0') if isinstance(w, dict) else w).strip('%'))
+                    mkt_val = current_p['total_value'] * (weight_val/100)
+                    price = px_port[t].iloc[-1] if t in px_port.columns else 0
+                    shares = mkt_val / price if price > 0 else 0
+                    
+                    rows.append({
+                        "Activo": t,
+                        "Peso": f"{weight_val}%",
+                        "Market Value": f"${mkt_val:,.2f}",
+                        "Precio": f"${price:,.2f}",
+                        "Acciones Est.": f"{shares:.2f}"
+                    })
+                
+                df_pos = pd.DataFrame(rows)
+                st.table(df_pos)
+            else:
+                st.info("Sin posiciones registradas.")
+
+    with tab_p3:
+        if current_p and not px_port.empty:
+            st.subheader("Análisis de Riesgo Institucional")
+            
+            # Calcular Beta y Volatilidad
+            # Usar retornos diarios
+            rets = px_port.pct_change().dropna()
+            
+            # Cartera Rebalanceada
+            weights_vec = []
+            valid_tickers = []
+            for t, w in current_p['assets'].items():
+                if t in rets.columns:
+                    val = float(str(w.get('weight', '0') if isinstance(w, dict) else w).strip('%'))/100
+                    weights_vec.append(val)
+                    valid_tickers.append(t)
+            
+            if valid_tickers:
+                port_rets = (rets[valid_tickers] * weights_vec).sum(axis=1)
+                
+                # Volatilidad Anualizada
+                vol_ann = port_rets.std() * np.sqrt(252) * 100
+                spy_vol = rets['SPY'].std() * np.sqrt(252) * 100
+                
+                # Beta
+                covariance = np.cov(port_rets, rets['SPY'])[0,1]
+                variance = np.var(rets['SPY'])
+                beta = covariance / variance
+                
+                c_r1, c_r2, c_r3 = st.columns(3)
+                c_r1.metric("Beta de Cartera", f"{beta:.2f}", help="Sensibilidad vs S&P 500. 1.0 = Mismo riesgo que mercado.")
+                c_r2.metric("Volatilidad Anual", f"{vol_ann:.2f}%", f"{vol_ann - spy_vol:.1f}% vs SPY")
+                c_r3.metric("Sharpe Ratio (Est.)", f"{(port_rets.mean()*252 - 0.04) / (port_rets.std()*np.sqrt(252)):.2f}", help="Retorno ajustado por riesgo (Rf=4%).")
+
+                st.divider()
+                st.subheader("Frontera de Correlación")
+                corr = rets[valid_tickers + ["SPY"]].corr()
+                fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto")
+                fig_corr.update_layout(template="plotly_dark", height=450)
+                st.plotly_chart(fig_corr, use_container_width=True)
+            else:
+                st.warning("No hay suficientes datos para calcular métricas de riesgo.")
+        else:
+            st.info("Configura tu cartera y sincroniza datos para ver el análisis de riesgo.")
+
+    with tab_p4:
+        if current_p:
             conn = sqlite3.connect('prometheus_intelligence.db')
             df_last_rec = pd.read_sql_query("SELECT final_recommendation FROM recommendations WHERE user_decision='ACEPTADA' ORDER BY timestamp DESC LIMIT 1", conn)
             conn.close()
-            
-            with st.form("portfolio_form_v5_enhanced"):
-                # Permitir añadir cualquier ticker manualmente
-                default_tickers = list(current_p['assets'].keys()) if current_p else ["SPY"]
-                
-                selected_tickers = st.multiselect(
-                    "Sectores y ETFs Frecuentes", 
-                    list(SECTORES_GICS.keys()) + ["SPY", "QQQ", "TLT", "GLD", "BITO", "DIA", "VTI"],
-                    default=[t for t in default_tickers if t in list(SECTORES_GICS.keys()) + ["SPY", "QQQ", "TLT", "GLD", "BITO", "DIA", "VTI"]]
-                )
-                
-                add_custom = st.text_input("Añadir otros Tickers (separados por coma, ej: NVDA, TSLA, BTC-USD)", "")
-                if add_custom:
-                    custom_list = [t.strip().upper() for t in add_custom.split(",") if t.strip()]
-                    selected_tickers = list(set(selected_tickers + custom_list))
-                
-                st.divider()
-                cash_val = st.number_input("💵 Efectivo Disponible (Cash USD)", value=current_p.get('cash', 0.0) if current_p else 5000.0)
-                total_v = st.number_input("💰 Valor Invertido Estimado (USD)", value=current_p['total_value'] if current_p else 100000.0)
-                
-                st.write("**Asignación de Pesos Actual (%)**")
-                weights_input = {}
-                for etf in selected_tickers:
-                    # Intentar obtener el peso anterior
-                    prev_asset = current_p['assets'].get(etf, '0') if current_p else '0'
-                    if isinstance(prev_asset, dict):
-                        default_w = int(prev_asset.get('weight', '0').strip('%'))
-                    else:
-                        default_w = int(str(prev_asset).strip('%'))
-                        
-                    weights_input[etf] = f"{st.slider(f'{etf}', 0, 100, default_w)}%"
-                
-                total_w_sum = sum([int(v.strip('%')) for v in weights_input.values()])
-                if total_w_sum > 100:
-                    st.error(f"⚠️ El total suma {total_w_sum}%. Debe ser máximo 100%. El resto se considera Cash.")
-                
-                if st.form_submit_button("📁 MEMORIZAR PORTAFOLIO"):
-                    with st.spinner("Actualizando Terminal Bloomberg..."):
-                        data_spy = get_global_data(["SPY"], True)
-                        db_lib.save_portfolio(weights_input, total_v, cash_val, data_spy['SPY'].iloc[-1])
-                        st.success("Cartera consolidada exitosamente.")
-                        st.rerun()
 
-        with col2:
-            st.subheader("Visualización de Exposición")
-            if current_p:
-                assets_data = current_p['assets']
-                labels = list(assets_data.keys()) + ["CASH"]
-                values = [float(str(v).strip('%')) if not isinstance(v, dict) else float(v.get('weight', '0').strip('%')) for v in assets_data.values()]
-                
-                # Calcular cash residual si la suma de pesos < 100
-                spent_w = sum(values)
-                cash_w = 100 - spent_w if spent_w < 100 else 0
-                values.append(cash_w)
-                
-                fig = px.pie(names=labels, values=values, hole=0.4, 
-                             color_discrete_sequence=px.colors.sequential.Oranges_r)
-                fig.update_layout(template="plotly_dark", showlegend=True, margin=dict(t=0, b=0, l=0, r=0))
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown(f'<div class="metric-card"><b>Total Gestionado:</b> ${total_v + cash_val:,.2f}<br>'
-                            f'<b>Market Value:</b> ${total_v:,.2f}<br>'
-                            f'<b>Cash:</b> ${cash_val:,.2f}</div>', unsafe_allow_html=True)
-            else:
-                st.info("Configura tu cartera inicial para ver la distribución.")
-
-    with tab_p2:
-        if current_p:
-            st.subheader("Análisis de Riesgo y Coherencia")
             if not df_last_rec.empty:
                 rec_json = json.loads(df_last_rec.iloc[0]['final_recommendation'])
+                st.subheader("Asesor de Rebalanceo Inteligente")
                 
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.write("**Desviación Táctica vs Prometheus**")
-                    all_labels = list(set(list(current_p['assets'].keys()) + list(rec_json['propuesta'].keys())))
-                    
-                    def get_w(p, l):
-                        val = p.get(l, '0')
-                        return float(val.get('weight', '0').strip('%')) if isinstance(val, dict) else float(str(val).strip('%'))
-
-                    actual = [get_w(current_p['assets'], l) for l in all_labels]
-                    target = [float(str(rec_json['propuesta'].get(l, '0')).strip('%')) for l in all_labels]
-                    
-                    fig_comp = go.Figure(data=[
-                        go.Bar(name='Real', x=all_labels, y=actual, marker_color='#333'),
-                        go.Bar(name='Target', x=all_labels, y=target, marker_color='#f97316')
-                    ])
-                    fig_comp.update_layout(template="plotly_dark", barmode='group', height=350)
-                    st.plotly_chart(fig_comp, use_container_width=True)
-                
-                with col_b:
-                    st.write("**Métricas de Salud de Cartera**")
-                    # Simulación de métricas profesionales
-                    tracking_error = 2.45
-                    st.metric("Tracking Error (vs Target)", f"{tracking_error}%", "Bajo")
-                    st.metric("Concentración (HHI)", "0.22", "-0.02")
-                    st.markdown("""
-                    <div style='font-size: 13px; color: #888;'>
-                    El Tracking Error mide la desviación de tu cartera real frente a la recomendación ideal de Prometheus. 
-                    Un valor bajo (<3%) indica alta fidelidad al sistema.
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info("Acepta una recomendación oficial para activar el análisis de coherencia.")
-        else:
-            st.warning("Define tu cartera en la pestaña 'Configuración' primero.")
-
-    with tab_p3:
-        if current_p and not df_last_rec.empty:
-            st.subheader("Planificador de Rebalanceo")
-            rec_json = json.loads(df_last_rec.iloc[0]['final_recommendation'])
-            
-            with st.spinner("Calculando órdenes necesarias..."):
-                all_tickers = list(set(list(current_p['assets'].keys()) + list(rec_json['propuesta'].keys())))
-                px_data = get_global_data(all_tickers, True)
-                
-                if not px_data.empty:
-                    last_prices = px_data.iloc[-1].to_dict()
+                if not px_port.empty:
+                    last_prices = px_port.iloc[-1].to_dict()
                     orders = utils_lib.calculate_rebalancing(current_p['assets'], rec_json['propuesta'], current_p['total_value'], last_prices)
                     
-                    # Mostrar tabla de órdenes
-                    st.write("Para alcanzar la asignación recomendada, deberías realizar los siguientes ajustes:")
+                    st.write("Frente a la última recomendación aceptada, el sistema propone:")
                     
-                    order_rows = []
                     for o in orders:
                         action = "COMPRAR" if o['shares_to_buy'] > 0 else "VENDER"
-                        color = "#059669" if action == "COMPRAR" else "#ef4444"
-                        order_rows.append({
-                            "Ticker": o['ticker'],
-                            "Acción": action,
-                            "Monto (USD)": f"${abs(o['diff_abs']):,.2f}",
-                            "Acciones Aprox.": f"{abs(o['shares_to_buy']):.2f}",
-                            "Precio Ref.": f"${last_prices.get(o['ticker'], 0):.2f}"
-                        })
+                        icon = "🟢" if action == "COMPRAR" else "🔴"
+                        st.markdown(f"""
+                        <div style="background-color: #080808; padding: 15px; border-radius: 4px; margin-bottom: 10px; border-left: 5px solid {'#059669' if action == 'COMPRAR' else '#ef4444'};">
+                            <span style="font-size: 18px; font-weight: bold;">{icon} {action} {o['ticker']}</span><br>
+                            <span style="color: #888;">Monto: ${abs(o['diff_abs']):,.2f} | Acciones aprox: {abs(o['shares_to_buy']):.2f} @ ${last_prices.get(o['ticker'], 0):.2f}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
                     
-                    df_orders = pd.DataFrame(order_rows)
-                    st.table(df_orders)
-                    
-                    st.info("💡 **Consejo:** Considera las comisiones de tu broker antes de realizar ajustes pequeños. Prometheus recomienda rebalancear solo si la desviación es >5%.")
+                    if not orders:
+                        st.success("Tu cartera está perfectamente alineada con la estrategia Prometheus.")
                 else:
-                    st.error("Error al obtener precios en tiempo real para el rebalanceo.")
+                    st.error("Error sincronizando precios para el rebalanceo.")
+            else:
+                st.info("Acepta una recomendación de los agentes para activar el asesor de rebalanceo.")
         else:
             st.info("Se requiere una cartera configurada y una recomendación aceptada para usar el Asesor de Rebalanceo.")
 
