@@ -304,8 +304,14 @@ elif menu == "Mi Portafolio":
     col_g1, col_g2 = st.columns([3, 1])
     with col_g1:
         st.markdown(f"""
-        <div style="background-color: #0c0c0c; border-left: 4px solid {'#f97316' if integra else '#ef4444'}; padding: 10px; border-radius: 4px;">
-            <span style="color: #f97316; font-weight: bold;">AGENTE GUARDIÁN:</span> {msg_integra} | <i>{resumen_g['msg']}</i>
+        <div style="background-color: #0c0c0c; border-left: 4px solid {'#f97316' if integra else '#ef4444'}; padding: 12px; border-radius: 4px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">🛡️</span>
+                <span style="color: #f97316; font-weight: bold; letter-spacing: 0.5px;">PROMETHEUS GUARDIAN:</span>
+            </div>
+            <div style="margin-top: 4px; color: #e5e7eb; font-size: 14px;">
+                {msg_integra} | <span style="color: #888;">{resumen_g['msg']}</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     with col_g2:
@@ -407,72 +413,79 @@ elif menu == "Mi Portafolio":
     with tab_p2:
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
-            st.subheader("Configuración de Activos (Modo Auto)")
-            with st.form("portfolio_form_v7"):
-                frequent = ["SPY", "QQQ", "DIA", "IWM", "XLF", "XLK", "XLE", "VTI", "TLT", "GLD", "BITO", "TSLA", "NVDA", "AAPL", "MSFT"]
-                current_tickers = list(current_p['assets'].keys()) if current_p else ["SPY"]
+            st.subheader("Configuración de Activos (Manual)")
+            with st.form("portfolio_form_v8"):
+                st.info("Introduce los tickers de los ETFs que deseas monitorizar (ej: SPY, VOO, TLT, QQQ). El Agente Guardián validará cada entrada en tiempo real.")
                 
-                selected = st.multiselect("Sectores y ETFs Destacados", frequent, 
-                                          default=[t for t in current_tickers if t in frequent])
+                current_tickers_list = list(current_p['assets'].keys()) if (current_p and current_p.get('assets')) else []
+                manual_entry = st.text_area("Lista de ETFs (separados por coma)", 
+                                           value=", ".join(current_tickers_list) if current_tickers_list else "SPY, QQQ")
                 
-                manual = st.text_input("Añadir otros Tickers (ej: META, BTC-USD, ETH-USD)", 
-                                       ", ".join([t for t in current_tickers if t not in frequent]))
-                
-                all_t = list(set(selected + [t.strip().upper() for t in manual.split(",") if t.strip()]))
+                tickers_to_process = [t.strip().upper() for t in manual_entry.split(",") if t.strip()]
                 
                 st.divider()
-                st.write("**Inventario de Participaciones**")
+                st.write("**Control de Participaciones**")
                 shares_input = {}
-                for t in all_t:
-                    prev = current_p['assets'].get(t, {}) if current_p else {}
-                    def_shares = float(prev.get('shares', 0.0)) if isinstance(prev, dict) else 0.0
-                    shares_input[t] = st.number_input(f"Participaciones en {t}", value=def_shares, min_value=0.0, step=0.01)
+                for t in tickers_to_process:
+                    # Buscamos si ya existía en el portafolio anterior
+                    prev_data = current_p['assets'].get(t, {}) if current_p else {}
+                    def_shares = float(prev_data.get('shares', 0.0)) if isinstance(prev_data, dict) else 0.0
+                    
+                    # El guardián da feedback visual si el ticker ya está cargado en caché de mercado
+                    valid_t, msg_t = guardian.validar_ticker(t)
+                    label_suffix = " ✅" if valid_t else " 🔍"
+                    shares_input[t] = st.number_input(f"Cantidad de {t}{label_suffix}", value=def_shares, min_value=0.0, step=0.01)
                 
                 st.divider()
-                cash_input = st.number_input("💵 Cash en Cuenta (USD)", value=current_p.get('cash', 0.0) if current_p else 10000.0)
+                cash_input = st.number_input("💵 Efectivo (Cash USD)", value=current_p.get('cash', 0.0) if current_p else 10000.0)
                 
-                if st.form_submit_button("🗄️ CONSOLIDAR Y CALCULAR PESOS"):
-                    with st.spinner("Sincronizando precios y recalculando..."):
-                        all_req = list(set(all_t + ["SPY"]))
-                        current_prices_df = get_global_data(all_req, True)
-                        
-                        if not current_prices_df.empty:
-                            last_px = current_prices_df.iloc[-1]
+                if st.form_submit_button("🗄️ CONSOLIDAR CARTERA"):
+                    if not tickers_to_process:
+                        st.error("Protocolo Guardian: No has introducido ningún ticker para monitorizar.")
+                    else:
+                        with st.spinner("Guardián: Validando activos y sincronizando cotizaciones..."):
+                            all_req_t = list(set(tickers_to_process + ["SPY", "^VIX"]))
+                            new_data_df = get_global_data(all_req_t, True)
                             
-                            # Calibración de Market Value
-                            mv_dict = {}
-                            total_inv = 0.0
-                            for t, shares in shares_input.items():
-                                px_val = float(last_px[t]) if t in last_px else 0.0
-                                mv = float(shares * px_val)
-                                mv_dict[t] = {"shares": shares, "price": px_val, "market_value": mv}
-                                total_inv += mv
-                            
-                            total_port_val = float(total_inv + cash_input)
-                            
-                            # Generación de Assets Finales con Pesos Calculados Automáticamente
-                            final_assets = {}
-                            for t, data in mv_dict.items():
-                                w_calc = (data['market_value'] / total_port_val * 100) if total_port_val > 0 else 0.0
-                                final_assets[t] = {
-                                    "weight": f"{w_calc:.2f}%",
-                                    "shares": float(data['shares']),
-                                    "price": float(data['price'])
-                                }
-                            
-                            spy_price = float(last_px['SPY']) if 'SPY' in last_px else 0.0
-                            
-                            db_lib.save_portfolio(final_assets, float(total_inv), float(cash_input), float(spy_price))
-                            st.success("Configuración institucional consolidada.")
-                            st.rerun()
-                        else:
-                            st.error("Error crítico: Fallo en la conexión Bloomberg para obtención de precios.")
+                            if not new_data_df.empty:
+                                last_prices_new = new_data_df.iloc[-1]
+                                
+                                # Cálculo de MV y pesos
+                                mv_map = {}
+                                total_market_v = 0.0
+                                for t, sh in shares_input.items():
+                                    price_curr = float(last_prices_new[t]) if t in last_prices_new else 0.0
+                                    mv = float(sh * price_curr)
+                                    mv_map[t] = {"shares": sh, "price": price_curr, "market_value": mv}
+                                    total_market_v += mv
+                                
+                                nav_total = float(total_market_v + cash_input)
+                                
+                                # Construcción de estructura final
+                                final_p_assets = {}
+                                for t, d in mv_map.items():
+                                    w_calc = (d['market_value'] / nav_total * 100) if nav_total > 0 else 0.0
+                                    final_p_assets[t] = {
+                                        "weight": f"{w_calc:.2f}%",
+                                        "shares": float(d['shares']),
+                                        "price": float(d['price'])
+                                    }
+                                
+                                spy_px = float(last_prices_new['SPY']) if 'SPY' in last_prices_new else 0.0
+                                db_lib.save_portfolio(final_p_assets, float(total_market_v), float(cash_input), float(spy_px))
+                                st.success("Agente Guardián: Cartera consolidada y validada con éxito.")
+                                st.rerun()
+                            else:
+                                st.error("Fallo de conexión YFinance. El Guardián no puede verificar los precios en este momento.")
 
         with col_c2:
             st.subheader("Auditoría de Posiciones")
-            if current_p:
+            if current_p and current_p.get('assets'):
                 rows = []
                 for t, w in current_p['assets'].items():
+                    # Validación del guardián para cada fila
+                    v_icon = "✅" if t in px_port.columns else "⏳"
+                    
                     if isinstance(w, dict):
                         w_val = w.get('weight', '0%')
                         shares = w.get('shares', 0)
@@ -485,18 +498,31 @@ elif menu == "Mi Portafolio":
                         mv = current_p['total_value'] * (float(str(w).strip('%'))/100)
                     
                     rows.append({
+                        "Estado": v_icon,
                         "Activo": t,
                         "Peso": w_val,
-                        "Acciones": shares,
-                        "Precio Ref.": f"${price:,.2f}" if isinstance(price, (int, float)) else price,
+                        "Acciones": f"{shares:,.2f}" if isinstance(shares, (int, float)) else shares,
                         "Market Value": f"${mv:,.2f}" if isinstance(mv, (int, float)) else mv
                     })
                 
-                df_pos = pd.DataFrame(rows)
-                st.table(df_pos)
-                st.caption("Nota: Los pesos se calculan automáticamente al consolidar la cartera basándose en el precio de cierre.")
+                df_audit = pd.DataFrame(rows)
+                st.table(df_audit)
+                st.caption("Nota: El Agente Guardián valida el estado de cada ticker en tiempo real.")
+                
+                st.divider()
+                st.markdown("""
+                <div style="background-color: #0f172a; padding: 15px; border-radius: 8px; border: 1px solid #1e293b;">
+                    <h4 style="color: #f97316; margin-top: 0;">🧠 Recomendaciones del Asesor</h4>
+                    <ul style="font-size: 13px; color: #cbd5e1; padding-left: 20px;">
+                        <li><b>Optimización Fiscal:</b> Considera integrar el cálculo de plusvalías latentes para un rebalanceo eficiente.</li>
+                        <li><b>Backtesting:</b> Implementa un simulador de "Qué pasaría si" para ver cómo afectaría un cambio en la cartera antes de ejecutarlo.</li>
+                        <li><b>Alertas de Stop-Loss:</b> Configura el Agente Guardián para enviarte notificaciones si un activo cae por debajo de su ATR(2).</li>
+                        <li><b>Correlación Extrema:</b> Añade un monitor de correlación rodante para detectar cuando tus activos se mueven demasiado sincronizados.</li>
+                    </ul>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.info("Sin posiciones registradas.")
+                st.info("Sin posiciones registradas para auditar.")
 
     with tab_p3:
         if current_p and not px_port.empty:
