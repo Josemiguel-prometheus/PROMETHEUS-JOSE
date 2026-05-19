@@ -25,17 +25,29 @@ def load_market_data(tickers, safe_mode=False):
             data = yf.download(tickers, period=period, interval="1d", progress=False, group_by='column')
             
             if data.empty:
+                log_system_event("WARNING", "DataFetcher", f"YFinance devolvió un DataFrame vacío para {tickers}")
                 if attempt < retries - 1:
                     time.sleep(2)
                     continue
                 return pd.DataFrame()
             
-            if isinstance(data.columns, pd.MultiIndex):
-                df = data['Close'].ffill().bfill()
-            else:
-                # Single ticker handling
-                df = data[['Close']].ffill().bfill()
-                df.columns = tickers
+            # Limpieza y estructura estándar
+            try:
+                if isinstance(data.columns, pd.MultiIndex):
+                    if 'Close' in data.columns.levels[0]:
+                        df = data['Close'].ffill().bfill()
+                    else:
+                        # Fallback por si la estructura es distinta
+                        df = data.ffill().bfill()
+                else:
+                    if 'Close' in data.columns:
+                        df = data[['Close']].ffill().bfill()
+                        df.columns = [t for t in tickers if t]
+                    else:
+                        df = data.ffill().bfill()
+            except Exception as e:
+                log_system_event("ERROR", "DataFetcher", f"Error procesando columnas: {str(e)}")
+                return pd.DataFrame()
             
             log_system_event("INFO", "DataFetcher", 
                              f"Sincronización exitosa ({'Safe' if safe_mode else 'Full'}): {len(tickers)} activos.")

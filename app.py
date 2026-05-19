@@ -300,9 +300,31 @@ elif menu == "Mi Portafolio":
         if current_p:
             # Fila Superior: Métricas Clave
             m1, m2, m3, m4 = st.columns(4)
-            total_net = current_p['total_value'] + current_p.get('cash', 0.0)
             
-            # Calcular Retorno Histórico vs Benchmark (Simulado si no hay más datos)
+            # Recalcular pesos y valores en tiempo real si px_port está disponible
+            real_time_assets = {}
+            total_market_value = 0.0
+            
+            if not px_port.empty:
+                last_prices = px_port.iloc[-1]
+                for t, data in current_p['assets'].items():
+                    shares = float(data.get('shares', 0.0)) if isinstance(data, dict) else 0.0
+                    price = float(last_prices[t]) if t in last_prices else (float(data.get('price', 0.0)) if isinstance(data, dict) else 0.0)
+                    mv = shares * price
+                    real_time_assets[t] = {"shares": shares, "price": price, "market_value": mv}
+                    total_market_value += mv
+            else:
+                # Fallback a datos estáticos si no hay conexión
+                for t, data in current_p['assets'].items():
+                    shares = float(data.get('shares', 0.0)) if isinstance(data, dict) else 0.0
+                    price = float(data.get('price', 0.0)) if isinstance(data, dict) else 0.0
+                    mv = shares * price
+                    real_time_assets[t] = {"shares": shares, "price": price, "market_value": mv}
+                    total_market_value += mv
+
+            total_net = total_market_value + current_p.get('cash', 0.0)
+            
+            # Calcular Retorno Histórico vs Benchmark
             if not px_port.empty:
                 prices_start = px_port.iloc[0]
                 prices_end = px_port.iloc[-1]
@@ -312,7 +334,7 @@ elif menu == "Mi Portafolio":
                 p_ret, s_ret, alpha = 0, 0, 0
 
             m1.metric("Valor Total (NAV)", f"${total_net:,.2f}", f"{p_ret*100:.2f}%")
-            m2.metric("Market Value", f"${current_p['total_value']:,.2f}")
+            m2.metric("Market Value", f"${total_market_value:,.2f}")
             m3.metric("Cash Balance", f"${current_p.get('cash', 0.0):,.2f}")
             m4.metric("Alpha vs SPY", f"{alpha*100:.2f}%", delta_color="normal")
 
@@ -320,16 +342,14 @@ elif menu == "Mi Portafolio":
             
             col_l, col_r = st.columns([1, 1])
             with col_l:
-                st.subheader("Diversificación Sectorial")
-                assets_data = current_p['assets']
-                labels = list(assets_data.keys()) + ["CASH"]
+                st.subheader("Diversificación Sectorial (Tiempo Real)")
+                labels = list(real_time_assets.keys()) + ["CASH"]
                 weights = []
-                for v in assets_data.values():
-                    if isinstance(v, dict): weights.append(float(str(v.get('weight', '0')).strip('%')))
-                    else: weights.append(float(str(v).strip('%')))
+                for t, data in real_time_assets.items():
+                    w = (data['market_value'] / total_net * 100) if total_net > 0 else 0.0
+                    weights.append(w)
                 
-                spent_w = sum(weights)
-                cash_w = 100 - spent_w if spent_w < 100 else 0
+                cash_w = (current_p.get('cash', 0.0) / total_net * 100) if total_net > 0 else 0.0
                 weights.append(cash_w)
                 
                 fig = px.pie(names=labels, values=weights, hole=0.5, 
@@ -340,23 +360,17 @@ elif menu == "Mi Portafolio":
             with col_r:
                 st.subheader("Performance vs SPY (Base 100)")
                 if not px_port.empty:
-                    # Crear índice de rendimiento acumulado
+                    # Crear índice de rendimiento acumulado dinámico 
                     weights_dict = {}
-                    for t, v in current_p['assets'].items():
-                        if isinstance(v, dict): weights_dict[t] = float(str(v.get('weight', '0')).strip('%'))/100
-                        else: weights_dict[t] = float(str(v).strip('%'))/100
+                    for t, data in real_time_assets.items():
+                        weights_dict[t] = data['market_value'] / total_net if total_net > 0 else 0.0
                     
-                    # Normalizar precios
                     norm_px = px_port / px_port.iloc[0] * 100
-                    
-                    # Cartera (weighted sum)
                     port_index = pd.Series(0, index=norm_px.index)
                     for t, w in weights_dict.items():
-                        if t in norm_px.columns:
-                            port_index += norm_px[t] * w
+                        if t in norm_px.columns: port_index += norm_px[t] * w
                     
-                    # Add cash component (stable at 100)
-                    port_index += (1 - sum(weights_dict.values())) * 100
+                    port_index += (current_p.get('cash', 0.0) / total_net) * 100 if total_net > 0 else 0.0
 
                     fig_perf = go.Figure()
                     fig_perf.add_trace(go.Scatter(x=port_index.index, y=port_index, name='Mi Cartera', line=dict(color='#f97316', width=3)))
@@ -365,16 +379,15 @@ elif menu == "Mi Portafolio":
                                          legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig_perf, use_container_width=True)
                 else:
-                    st.info("Sin datos de mercado suficientes para graficar.")
+                    st.info("Sincroniza el terminal para ver el gráfico de performance.")
         else:
             st.info("Configura tu cartera en la pestaña 'Configuración' para comenzar.")
 
     with tab_p2:
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
-            st.subheader("Inventario de Activos")
-            with st.form("portfolio_form_v6"):
-                # Lista expandida de sugerencias
+            st.subheader("Configuración de Activos (Modo Auto)")
+            with st.form("portfolio_form_v7"):
                 frequent = ["SPY", "QQQ", "DIA", "IWM", "XLF", "XLK", "XLE", "VTI", "TLT", "GLD", "BITO", "TSLA", "NVDA", "AAPL", "MSFT"]
                 current_tickers = list(current_p['assets'].keys()) if current_p else ["SPY"]
                 
@@ -387,47 +400,80 @@ elif menu == "Mi Portafolio":
                 all_t = list(set(selected + [t.strip().upper() for t in manual.split(",") if t.strip()]))
                 
                 st.divider()
-                cash_input = st.number_input("💵 Cash en Cuenta (USD)", value=current_p.get('cash', 0.0) if current_p else 10000.0)
-                inv_input = st.number_input("💰 Valor Invertido Estimado (USD)", value=current_p['total_value'] if current_p else 90000.0)
-                
-                st.write("**Asignación de Pesos Actual (%)**")
-                new_weights = {}
+                st.write("**Inventario de Participaciones**")
+                shares_input = {}
                 for t in all_t:
-                    prev = current_p['assets'].get(t, '0') if current_p else '0'
-                    def_w = int(prev.get('weight', '0').strip('%')) if isinstance(prev, dict) else int(str(prev).strip('%'))
-                    new_weights[t] = f"{st.slider(f'{t}', 0, 100, def_w)}%"
+                    prev = current_p['assets'].get(t, {}) if current_p else {}
+                    def_shares = float(prev.get('shares', 0.0)) if isinstance(prev, dict) else 0.0
+                    shares_input[t] = st.number_input(f"Participaciones en {t}", value=def_shares, min_value=0.0, step=0.01)
                 
-                total_w = sum([int(v.strip('%')) for v in new_weights.values()])
-                if total_w > 100:
-                    st.error(f"Error: La asignación total es {total_w}%. El máximo permitido es 100%.")
+                st.divider()
+                cash_input = st.number_input("💵 Cash en Cuenta (USD)", value=current_p.get('cash', 0.0) if current_p else 10000.0)
                 
-                if st.form_submit_button("🗄️ CONSOLIDAR CARTERA"):
-                    with st.spinner("Sincronizando con Base de Datos..."):
-                        spy_data = get_global_data(["SPY"], True)
-                        db_lib.save_portfolio(new_weights, inv_input, cash_input, spy_data['SPY'].iloc[-1])
-                        st.success("Configuración guardada.")
-                        st.rerun()
+                if st.form_submit_button("🗄️ CONSOLIDAR Y CALCULAR PESOS"):
+                    with st.spinner("Sincronizando precios y recalculando..."):
+                        all_req = list(set(all_t + ["SPY"]))
+                        current_prices_df = get_global_data(all_req, True)
+                        
+                        if not current_prices_df.empty:
+                            last_px = current_prices_df.iloc[-1]
+                            
+                            # Calibración de Market Value
+                            mv_dict = {}
+                            total_inv = 0.0
+                            for t, shares in shares_input.items():
+                                px_val = last_px[t] if t in last_px else 0.0
+                                mv = shares * px_val
+                                mv_dict[t] = {"shares": shares, "price": px_val, "market_value": mv}
+                                total_inv += mv
+                            
+                            total_port_val = total_inv + cash_input
+                            
+                            # Generación de Assets Finales con Pesos Calculados Automáticamente
+                            final_assets = {}
+                            for t, data in mv_dict.items():
+                                w_calc = (data['market_value'] / total_port_val * 100) if total_port_val > 0 else 0.0
+                                final_assets[t] = {
+                                    "weight": f"{w_calc:.2f}%",
+                                    "shares": data['shares'],
+                                    "price": data['price']
+                                }
+                            
+                            spy_price = float(last_px['SPY']) if 'SPY' in last_px else 0.0
+                            
+                            db_lib.save_portfolio(final_assets, total_inv, cash_input, spy_price)
+                            st.success("Configuración institucional consolidada.")
+                            st.rerun()
+                        else:
+                            st.error("Error crítico: Fallo en la conexión Bloomberg para obtención de precios.")
 
         with col_c2:
             st.subheader("Auditoría de Posiciones")
             if current_p:
                 rows = []
                 for t, w in current_p['assets'].items():
-                    weight_val = float(str(w.get('weight', '0') if isinstance(w, dict) else w).strip('%'))
-                    mkt_val = current_p['total_value'] * (weight_val/100)
-                    price = px_port[t].iloc[-1] if t in px_port.columns else 0
-                    shares = mkt_val / price if price > 0 else 0
+                    if isinstance(w, dict):
+                        w_val = w.get('weight', '0%')
+                        shares = w.get('shares', 0)
+                        price = w.get('price', 0)
+                        mv = shares * price
+                    else:
+                        w_val = w
+                        shares = "N/A"
+                        price = "N/A"
+                        mv = current_p['total_value'] * (float(str(w).strip('%'))/100)
                     
                     rows.append({
                         "Activo": t,
-                        "Peso": f"{weight_val}%",
-                        "Market Value": f"${mkt_val:,.2f}",
-                        "Precio": f"${price:,.2f}",
-                        "Acciones Est.": f"{shares:.2f}"
+                        "Peso": w_val,
+                        "Acciones": shares,
+                        "Precio Ref.": f"${price:,.2f}" if isinstance(price, (int, float)) else price,
+                        "Market Value": f"${mv:,.2f}" if isinstance(mv, (int, float)) else mv
                     })
                 
                 df_pos = pd.DataFrame(rows)
                 st.table(df_pos)
+                st.caption("Nota: Los pesos se calculan automáticamente al consolidar la cartera basándose en el precio de cierre.")
             else:
                 st.info("Sin posiciones registradas.")
 
