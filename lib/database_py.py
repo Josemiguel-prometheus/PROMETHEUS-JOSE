@@ -51,11 +51,18 @@ def init_db():
         CREATE TABLE IF NOT EXISTS portfolio (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            assets TEXT, -- JSON con {ticker: %, ...}
+            assets TEXT, -- JSON con {ticker: {weight: %, shares: N, price: X}, ...}
             total_value REAL DEFAULT 100000.0,
+            cash REAL DEFAULT 0.0,
             benchmark_spy_price REAL
         )
     ''')
+    
+    # Migración: Verificar si la columna 'cash' existe
+    cursor.execute("PRAGMA table_info(portfolio)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'cash' not in columns:
+        cursor.execute("ALTER TABLE portfolio ADD COLUMN cash REAL DEFAULT 0.0")
 
     # Tabla de Insights de Aprendizaje
     cursor.execute('''
@@ -107,13 +114,13 @@ def log_system_event(level, module, message):
     finally:
         conn.close()
 
-def save_portfolio(assets, total_value, spy_price):
+def save_portfolio(assets, total_value, cash, spy_price):
     conn = get_db_connection()
     if not conn: return
     try:
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO portfolio (assets, total_value, benchmark_spy_price) VALUES (?, ?, ?)', 
-                       (json.dumps(assets), total_value, spy_price))
+        cursor.execute('INSERT INTO portfolio (assets, total_value, cash, benchmark_spy_price) VALUES (?, ?, ?, ?)', 
+                       (json.dumps(assets), total_value, cash, spy_price))
         conn.commit()
     finally:
         conn.close()

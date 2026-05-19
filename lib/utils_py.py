@@ -89,11 +89,57 @@ def generate_excel_report(history_df, metrics, portfolio_data):
 
 def calculate_portfolio_performance(portfolio_assets, market_prices, start_prices):
     # Calcula el retorno de la cartera vs el benchmark
-    portfolio_return = 0
-    for ticker, weight in portfolio_assets.items():
+    def get_val(v):
+        if isinstance(v, dict): return float(str(v.get('weight', '0')).strip('%'))
+        return float(str(v).strip('%'))
+    
+    total_w = sum([get_val(v) for v in portfolio_assets.values()])
+    if total_w == 0: return 0, 0
+    
+    for ticker, weight_val in portfolio_assets.items():
         if ticker in market_prices and ticker in start_prices:
             ret = (market_prices[ticker] / start_prices[ticker] - 1)
-            portfolio_return += ret * (float(weight.strip('%')) / 100)
+            # Handle both string '%' and dict with 'weight'
+            if isinstance(weight_val, dict):
+                w = float(str(weight_val.get('weight', '0')).strip('%'))
+            else:
+                w = float(str(weight_val).strip('%'))
+            portfolio_return += ret * (w / 100)
     
     spy_return = (market_prices['SPY'] / start_prices['SPY'] - 1)
     return portfolio_return, spy_return
+
+def calculate_rebalancing(current_portfolio, target_allocation, total_value, market_prices):
+    """
+    Calcula exactamente cuánto comprar/vender para llegar al target.
+    current_portfolio: {ticker: {shares: N, price: X, weight: %}, ...}
+    target_allocation: {ticker: %, ...}
+    """
+    rebalance_orders = []
+    
+    for ticker, target_pct in target_allocation.items():
+        target_val = total_value * (float(str(target_pct).strip('%')) / 100)
+        current_val = 0
+        if ticker in current_portfolio:
+            assets = current_portfolio[ticker]
+            # Si guardamos como dict con 'weight', 'shares' etc
+            if isinstance(assets, dict):
+                current_val = assets.get('shares', 0) * market_prices.get(ticker, assets.get('price', 0))
+            else:
+                # Fallback para versión anterior que guardaba solo % como string
+                current_val = total_value * (float(str(assets).strip('%')) / 100)
+        
+        diff = target_val - current_val
+        price = market_prices.get(ticker, 0)
+        
+        if price > 0:
+            shares_diff = diff / price
+            rebalance_orders.append({
+                "ticker": ticker,
+                "target_val": target_val,
+                "current_val": current_val,
+                "diff_abs": diff,
+                "shares_to_buy": shares_diff
+            })
+            
+    return rebalance_orders
