@@ -296,6 +296,27 @@ elif menu == "Mi Portafolio":
     else:
         px_port = pd.DataFrame()
 
+    # --- AGENTE GUARDIÁN ---
+    guardian = agents_lib.AgenteGuardian(current_p, px_port)
+    integra, msg_integra = guardian.validar_integridad()
+    resumen_g = guardian.obtener_resumen_tiempo_real()
+    
+    col_g1, col_g2 = st.columns([3, 1])
+    with col_g1:
+        st.markdown(f"""
+        <div style="background-color: #0c0c0c; border-left: 4px solid {'#f97316' if integra else '#ef4444'}; padding: 10px; border-radius: 4px;">
+            <span style="color: #f97316; font-weight: bold;">AGENTE GUARDIÁN:</span> {msg_integra} | <i>{resumen_g['msg']}</i>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_g2:
+        st.markdown(f"""
+        <div style="text-align: right; color: #888; font-size: 12px;">
+            <b>STATUS:</b> <span style="color: {'#059669' if resumen_g['status'] == 'ESTABLE' else '#ef4444'};">{resumen_g['status']}</span><br>
+            <b>SYNC:</b> {resumen_g['last_sync']}
+        </div>
+        """, unsafe_allow_html=True)
+    st.write("")
+
     with tab_p1:
         if current_p:
             # Fila Superior: Métricas Clave
@@ -422,12 +443,12 @@ elif menu == "Mi Portafolio":
                             mv_dict = {}
                             total_inv = 0.0
                             for t, shares in shares_input.items():
-                                px_val = last_px[t] if t in last_px else 0.0
-                                mv = shares * px_val
+                                px_val = float(last_px[t]) if t in last_px else 0.0
+                                mv = float(shares * px_val)
                                 mv_dict[t] = {"shares": shares, "price": px_val, "market_value": mv}
                                 total_inv += mv
                             
-                            total_port_val = total_inv + cash_input
+                            total_port_val = float(total_inv + cash_input)
                             
                             # Generación de Assets Finales con Pesos Calculados Automáticamente
                             final_assets = {}
@@ -435,13 +456,13 @@ elif menu == "Mi Portafolio":
                                 w_calc = (data['market_value'] / total_port_val * 100) if total_port_val > 0 else 0.0
                                 final_assets[t] = {
                                     "weight": f"{w_calc:.2f}%",
-                                    "shares": data['shares'],
-                                    "price": data['price']
+                                    "shares": float(data['shares']),
+                                    "price": float(data['price'])
                                 }
                             
                             spy_price = float(last_px['SPY']) if 'SPY' in last_px else 0.0
                             
-                            db_lib.save_portfolio(final_assets, total_inv, cash_input, spy_price)
+                            db_lib.save_portfolio(final_assets, float(total_inv), float(cash_input), float(spy_price))
                             st.success("Configuración institucional consolidada.")
                             st.rerun()
                         else:
