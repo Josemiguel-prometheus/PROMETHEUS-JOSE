@@ -320,7 +320,7 @@ elif menu == "Mi Portafolio":
                 weights_input = {}
                 for etf in selected_tickers:
                     # Intentar obtener el peso anterior
-                    prev_asset = current_p['assets'].get(etf, '0')
+                    prev_asset = current_p['assets'].get(etf, '0') if current_p else '0'
                     if isinstance(prev_asset, dict):
                         default_w = int(prev_asset.get('weight', '0').strip('%'))
                     else:
