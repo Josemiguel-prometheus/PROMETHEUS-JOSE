@@ -197,3 +197,56 @@ class AgenteGuardian:
                 "active_tickers": active_tickers
             }
         return {"status": "OFFLINE", "vix": "N/A", "last_sync": "N/A", "msg": "Esperando enlace con YFinance..."}
+
+    def generar_recomendaciones_asesor(self, info_vix=20):
+        # Generar recomendaciones dinámicas basadas en los activos actuales
+        recs = []
+        if not self.portfolio:
+            recs.append("<b>Inicialización</b>: Cree su cartera para recibir recomendaciones estratégicas.")
+            return recs
+            
+        assets = self.portfolio.get('assets', {})
+        total_val = self.portfolio.get('total_value', 100000.0)
+        cash = self.portfolio.get('cash', 0.0)
+        cash_pct = (cash / (total_val + cash) * 100) if (total_val + cash) > 0 else 0.0
+        
+        # 1. Recomendación sobre cash de la cartera
+        if cash_pct > 30.0:
+            recs.append("<b>Exceso de Liquidez:</b> El efectivo representa el {:.1f}% del capital total. Recomendamos una entrada escalonada en el ETF líder para mitigar la pérdida de poder adquisitivo por inflación.".format(cash_pct))
+        elif cash_pct < 5.0:
+            recs.append("<b>Riesgo de Liquidez Bajo:</b> El efectivo es menor al 5.0% de su cartera. Se sugiere mantener al menos un 10.0% para aprovechar correcciones tácticas de mercado.")
+            
+        # 2. Recomendación sobre número de activos para diversificación
+        tclass = len(assets)
+        if tclass == 1:
+            recs.append("<b>Concentración Extrema:</b> Solo posee un activo en cartera. Se recomienda añadir un ETF Core general (ej: SPY) y cobertura de renta fija o materias primas (ej: TLT, GLD).")
+        elif tclass > 8:
+            recs.append("<b>Sobre-diversificación:</b> Monitoriza {} activos simultáneamente. Demasiados activos reducen el Alpha y diluyen el impacto de las señales de rotación sectorial.".format(tclass))
+            
+        # 3. Recomendación sectorial basada en VIX
+        if info_vix > 25:
+            recs.append("<b>Entorno de Alta Volatilidad (VIX > 25):</b> Las cotizaciones mundiales sufren estrés extremo. El Asesor le insta a rebalancear hacia activos defensivos (GLD, TLT) y limitar la exposición a sectores cíclicos.")
+        else:
+            recs.append("<b>Clima Expansivo (VIX < 25):</b> VIX en nivel estable ({:.2f}). Es un excelente momento para sobreponderar el ETF del Sector Líder recomendado por Prometheus.".format(info_vix))
+            
+        # 4. Monitoreo de correlación
+        if not self.market_data.empty:
+            active_tickers = [c for c in self.market_data.columns if c not in ['^VIX', 'SPY']]
+            if len(active_tickers) > 1:
+                rets = self.market_data[active_tickers].pct_change().dropna()
+                corr = rets.corr()
+                extreme_pairs = []
+                for i in range(len(active_tickers)):
+                    for j in range(i+1, len(active_tickers)):
+                        t1, t2 = active_tickers[i], active_tickers[j]
+                        if t1 in corr.index and t2 in corr.columns:
+                            c_val = corr.loc[t1, t2]
+                            if c_val > 0.85:
+                                extreme_pairs.append((t1, t2, c_val))
+                if extreme_pairs:
+                    elements = ["{} y {} ({:.2f})".format(p[0], p[1], p[2]) for p in extreme_pairs]
+                    recs.append("<b>Sincronización Crítica:</b> Los pares {} muestran correlación extrema (>0.85). Se recomienda reducir exposición en uno de ellos para evitar el riesgo de caída conjunta.".format(", ".join(elements)))
+                else:
+                    recs.append("<b>Acoplamiento Saludable:</b> Los activos en cartera muestran descorrelación favorable en el mercado actual, potenciando los beneficios de la diversificación.")
+                    
+        return recs

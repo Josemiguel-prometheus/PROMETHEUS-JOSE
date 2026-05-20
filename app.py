@@ -545,14 +545,33 @@ elif menu == "Mi Portafolio":
                 st.caption("Nota: El Agente Guardián valida el estado de cada ticker en tiempo real.")
                 
                 st.divider()
-                st.markdown("""
-                <div style="background-color: #0f172a; padding: 15px; border-radius: 8px; border: 1px solid #1e293b;">
-                    <h4 style="color: #f97316; margin-top: 0;">🧠 Recomendaciones del Asesor</h4>
-                    <ul style="font-size: 13px; color: #cbd5e1; padding-left: 20px;">
-                        <li><b>Optimización Fiscal:</b> Considera integrar el cálculo de plusvalías latentes para un rebalanceo eficiente.</li>
-                        <li><b>Backtesting:</b> Implementa un simulador de "Qué pasaría si" para ver cómo afectaría un cambio en la cartera antes de ejecutarlo.</li>
-                        <li><b>Alertas de Stop-Loss:</b> Configura el Agente Guardián para enviarte notificaciones si un activo cae por debajo de su ATR(2).</li>
-                        <li><b>Correlación Extrema:</b> Añade un monitor de correlación rodante para detectar cuando tus activos se mueven demasiado sincronizados.</li>
+                # 24H Countdown Logic
+                last_update_ts = current_p.get('timestamp') if (current_p and 'timestamp' in current_p) else ""
+                try:
+                    p_time = datetime.strptime(last_update_ts.split(".")[0], "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    p_time = datetime.now()
+                
+                next_review = p_time + timedelta(hours=24)
+                diff = next_review - datetime.now()
+                hours_left = max(0, int(diff.total_seconds() // 3600))
+                mins_left = max(0, int((diff.total_seconds() % 3600) // 60))
+                
+                dynamic_recs = guardian.generar_recomendaciones_asesor(resumen_g.get('vix', 20.0))
+                rec_list_html = "".join([f"<li style='margin-bottom: 8px;'>{r}</li>" for r in dynamic_recs])
+                
+                st.markdown(f"""
+                <div style="background-color: #0c0c14; padding: 18px; border-radius: 6px; border: 1px solid #2e2a47; margin-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2e2a47; padding-bottom: 8px; margin-bottom: 12px;">
+                        <h4 style="color: #f97316; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <span>🧠</span> Asesor de Asignación Estratégica (Dynamic 24H)
+                        </h4>
+                        <span style="background-color: #1e1b4b; color: #a5b4fc; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-family: monospace;">
+                            Próxima actualización en: {hours_left:02d}h {mins_left:02d}m
+                        </span>
+                    </div>
+                    <ul style="font-size: 13px; color: #cbd5e1; padding-left: 18px; line-height: 1.5;">
+                        {rec_list_html}
                     </ul>
                 </div>
                 """, unsafe_allow_html=True)
@@ -599,6 +618,37 @@ elif menu == "Mi Portafolio":
                 fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto")
                 fig_corr.update_layout(template="plotly_dark", height=450)
                 st.plotly_chart(fig_corr, use_container_width=True)
+                
+                st.divider()
+                st.subheader("🕵️ Monitor de Correlación Rodante y Sincronización Extrema")
+                st.caption("Mide en tiempo real si tus activos se mueven demasiado sincronizados con el Benchmark, perdiendo la desasociación de riesgo.")
+                
+                rolling_win = min(30, len(rets))
+                if rolling_win > 5:
+                    rolling_corrs = {}
+                    for t in valid_tickers:
+                        if t != "SPY":
+                            rolling_corrs[t] = rets[t].rolling(window=rolling_win).corr(rets['SPY'])
+                    
+                    df_rolling = pd.DataFrame(rolling_corrs).dropna()
+                    if not df_rolling.empty:
+                        fig_roll = px.line(df_rolling, labels={"value": "Coeficiente de Correlación", "index": "Fecha"})
+                        fig_roll.add_hline(y=0.85, line_dash="dash", line_color="#ef4444", annotation_text="Sincronización Extrema (0.85)", annotation_position="top left")
+                        fig_roll.update_layout(template="plotly_dark", height=380, margin=dict(t=20, b=10, l=10, r=10),
+                                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                        st.plotly_chart(fig_roll, use_container_width=True)
+                        
+                        # Warning Alert block
+                        last_corrs = df_rolling.iloc[-1]
+                        extreme_list = last_corrs[last_corrs > 0.85].index.tolist()
+                        if extreme_list:
+                            st.error(f"🚨 **ALERTA DE SISTEMA: Sincronización Extrema Detectada** | Los activos **{', '.join(extreme_list)}** se mueven sincronizados (>0.85) con el S&P 500. El riesgo sistémico del portafolio se eleva al perder propiedades de cobertura.")
+                        else:
+                            st.success("✅ **Desacoplamiento Óptimo** | Ningún activo registra correlación extrema con el S&P 500. Sus activos ofrecen diversificación robusta.")
+                    else:
+                        st.info("Calculando matriz rodante... Se requiere un historial mayor de cotizaciones.")
+                else:
+                    st.info("Incrementando historial del terminal para habilitar el motor de correlación rodante.")
             else:
                 st.warning("No hay suficientes datos para calcular métricas de riesgo.")
         else:
@@ -607,28 +657,157 @@ elif menu == "Mi Portafolio":
     with tab_p4:
         if current_p:
             conn = sqlite3.connect('prometheus_intelligence.db')
-            df_last_rec = pd.read_sql_query("SELECT final_recommendation FROM recommendations WHERE user_decision='ACEPTADA' ORDER BY timestamp DESC LIMIT 1", conn)
+            df_last_rec = pd.read_sql_query("SELECT analyst_report, final_recommendation FROM recommendations WHERE user_decision='ACEPTADA' ORDER BY timestamp DESC LIMIT 1", conn)
             conn.close()
 
             if not df_last_rec.empty:
-                rec_json = json.loads(df_last_rec.iloc[0]['final_recommendation'])
-                st.subheader("Asesor de Rebalanceo Inteligente")
+                rec_json = json.loads(df_last_rec.iloc[0]['final_recommendation']) if df_last_rec.iloc[0]['final_recommendation'] else {}
+                report_json = json.loads(df_last_rec.iloc[0]['analyst_report']) if df_last_rec.iloc[0]['analyst_report'] else {}
+                
+                # Extract Top ETF (the leader)
+                leader_etf = "XLK" # Default fallback
+                if report_json and "top_etfs" in report_json and report_json["top_etfs"]:
+                    leader_etf = report_json["top_etfs"][0]
+                
+                st.subheader("⚖️ Asesor de Rebalanceo Inteligente Pro")
+                st.write(f"Sincronizado con la señal de rotación sectorial aceptada, centrada en **{leader_etf}**.")
                 
                 if not px_port.empty:
                     last_prices = px_port.iloc[-1].to_dict()
-                    orders = utils_lib.calculate_rebalancing(current_p['assets'], rec_json['propuesta'], current_p['total_value'], last_prices)
                     
-                    st.write("Frente a la última recomendación aceptada, el sistema propone:")
+                    # 1. Map allocation proposal
+                    propuesta = rec_json.get('propuesta', {})
+                    lider_pct = float(str(propuesta.get('lider', '25%')).strip('%'))
+                    core_pct = float(str(propuesta.get('core', '50%')).strip('%'))
+                    cash_pct = float(str(propuesta.get('cash', '25%')).strip('%'))
                     
-                    for o in orders:
-                        action = "COMPRAR" if o['shares_to_buy'] > 0 else "VENDER"
-                        icon = "🟢" if action == "COMPRAR" else "🔴"
+                    # Map proposal to real tickers
+                    target_pct_map = {
+                        leader_etf: lider_pct,
+                        "SPY": core_pct
+                    }
+                    
+                    total_nav = current_p['total_value'] + current_p.get('cash', 0.0)
+                    
+                    orders = []
+                    all_involved_tickers = list(set(list(current_p['assets'].keys()) + list(target_pct_map.keys())))
+                    
+                    for ticker in all_involved_tickers:
+                        if ticker == "CASH":
+                            continue
+                        target_pct = target_pct_map.get(ticker, 0.0)
+                        target_val = total_nav * (target_pct / 100.0)
+                        
+                        current_val = 0.0
+                        shares_curr = 0.0
+                        if ticker in current_p['assets']:
+                            asset_info = current_p['assets'][ticker]
+                            if isinstance(asset_info, dict):
+                                shares_curr = float(asset_info.get('shares', 0.0))
+                                current_val = shares_curr * float(last_prices.get(ticker, asset_info.get('price', 0.0)))
+                            else:
+                                current_val = float(current_p['total_value']) * (float(str(asset_info).strip('%')) / 100)
+                                
+                        diff_val = target_val - current_val
+                        price = float(last_prices.get(ticker, 0.0))
+                        if price == 0.0 and ticker in current_p['assets'] and isinstance(current_p['assets'][ticker], dict):
+                            price = float(current_p['assets'][ticker].get('price', 0.0))
+                        
+                        if price > 0:
+                            shares_diff = diff_val / price
+                            orders.append({
+                                "ticker": ticker,
+                                "target_pct": f"{target_pct:.2f}%",
+                                "current_pct": f"{(current_val / total_nav * 100):.2f}%" if total_nav > 0 else "0.00%",
+                                "target_val": target_val,
+                                "current_val": current_val,
+                                "diff_abs": diff_val,
+                                "shares_curr": shares_curr,
+                                "shares_to_buy": shares_diff,
+                                "price": price
+                            })
+                    
+                    # Sort orders: first SELLS (- shares_to_buy), then BUYS (+ shares_to_buy) to optimize liquidity lifecycle
+                    orders_sorted = sorted(orders, key=lambda x: x['shares_to_buy'])
+                    
+                    st.write("Frente a la última recomendación aceptada, el sistema propone el siguiente plan de rebalanceo:")
+                    
+                    col_act1, col_act2 = st.columns([2, 1])
+                    with col_act1:
+                        # Draw order cards
+                        for o in orders_sorted:
+                            if abs(o['shares_to_buy']) < 0.01:
+                                continue
+                            action = "COMPRAR" if o['shares_to_buy'] > 0 else "VENDER"
+                            icon = "🟢" if action == "COMPRAR" else "🔴"
+                            status_word = "Añadir más posiciones" if action == "COMPRAR" else "Liquidación de holdings excedentes"
+                            st.markdown(f"""
+                            <div style="background-color: #0b0b14; padding: 15px; border-radius: 6px; margin-bottom: 12px; border-left: 5px solid {'#10b981' if action == 'COMPRAR' else '#ef4444'}; border: 1px solid #1f1d2f;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="font-size: 15px; font-weight: bold; color: {'#10b981' if action == 'COMPRAR' else '#ef4444'};">{icon} {action} {o['ticker']}</span>
+                                    <span style="font-size: 11px; color: #888;">{status_word}</span>
+                                </div>
+                                <div style="margin-top: 6px; font-size: 13px; color: #cbd5e1;">
+                                    <b>Monto Operación:</b> ${abs(o['diff_abs']):,.2f} | <b>Acciones aproximadas:</b> {abs(o['shares_to_buy']):.2f} @ ${o['price']:.2f}<br>
+                                    <b>Transición de cartera:</b> {o['current_pct']} → <span style="color: #f97316; font-weight: bold;">{o['target_pct']}</span>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Show remaining/target Cash info
+                        target_cash_val = total_nav * (cash_pct / 100.0)
+                        current_cash_val = current_p.get('cash', 0.0)
+                        diff_cash = target_cash_val - current_cash_val
+                        
                         st.markdown(f"""
-                        <div style="background-color: #080808; padding: 15px; border-radius: 4px; margin-bottom: 10px; border-left: 5px solid {'#059669' if action == 'COMPRAR' else '#ef4444'};">
-                            <span style="font-size: 18px; font-weight: bold;">{icon} {action} {o['ticker']}</span><br>
-                            <span style="color: #888;">Monto: ${abs(o['diff_abs']):,.2f} | Acciones aprox: {abs(o['shares_to_buy']):.2f} @ ${last_prices.get(o['ticker'], 0):.2f}</span>
+                        <div style="background-color: #0d1527; padding: 12px; border-radius: 6px; border: 1px solid #1e293b; margin-top: 10px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #60a5fa;">💵 Ajuste de Liquidez de Caja</span><br>
+                            <span style="font-size: 12px; color: #94a3b8;">
+                                Caja Actual: ${current_cash_val:,.2f} ({ (current_cash_val/total_nav*100 if total_nav>0 else 0):.1f}%) | 
+                                Caja Objetivo: ${target_cash_val:,.2f} ({cash_pct:.1f}%)<br>
+                                Diferencial neto en efectivo: <b>{'+' if diff_cash >= 0 else ''}${diff_cash:,.2f}</b>
+                            </span>
                         </div>
                         """, unsafe_allow_html=True)
+                    
+                    with col_act2:
+                        st.markdown('<div class="metric-card" style="border-top: 4px solid #f97316; padding: 15px; background-color: #0c0c0f; border-radius: 4px;">', unsafe_allow_html=True)
+                        st.write("#### ⚖️ Consolidar Rebalanceo")
+                        st.caption("Al confirmar, se actualizará automáticamente la cartera monitoreada para reflejar la distribución de pesos del plan de inversión recomendado.")
+                        
+                        st.divider()
+                        st.write(f"**Valor total de la Cartera (NAV):** ${total_nav:,.2f}")
+                        st.write(f"**Distribución:** {leader_etf} ({lider_pct}%) | SPY ({core_pct}%) | Cash ({cash_pct}%)")
+                        
+                        if st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True):
+                            with st.spinner("Guardando la nueva arquitectura del portafolio..."):
+                                final_assets = {}
+                                total_market_v_new = 0.0
+                                
+                                # Build assets dictionary according to target shares
+                                for o in orders:
+                                    # Skip if target weight is 0%
+                                    o_target_pct = float(o['target_pct'].replace('%', ''))
+                                    if o_target_pct > 0:
+                                        target_val_new = total_nav * (o_target_pct / 100.0)
+                                        price_curr = float(o['price'])
+                                        new_sh_count = target_val_new / price_curr if price_curr > 0 else 0.0
+                                        
+                                        final_assets[o['ticker']] = {
+                                            "weight": f"{o_target_pct:.2f}%",
+                                            "shares": float(new_sh_count),
+                                            "price": float(price_curr)
+                                        }
+                                        total_market_v_new += target_val_new
+                                
+                                target_cash_new = total_nav * (cash_pct / 100.0)
+                                spy_px_new = float(last_prices.get('SPY', 450.0))
+                                
+                                # Guardar portafolio rebalanceado
+                                db_lib.save_portfolio(final_assets, float(total_market_v_new), float(target_cash_new), float(spy_px_new))
+                                st.success("¡Plan de Rebalanceo ejecutado con éxito! Pesos equilibrados.")
+                                st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
                     
                     if not orders:
                         st.success("Tu cartera está perfectamente alineada con la estrategia Prometheus.")
