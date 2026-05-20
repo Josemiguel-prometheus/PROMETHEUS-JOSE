@@ -414,19 +414,54 @@ elif menu == "Mi Portafolio":
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
             st.subheader("Configuración de Activos (Manual)")
+            
+            # Inicializar los tickers de la cartera en st.session_state si no existen descritos
+            if 'portfolio_tickers' not in st.session_state:
+                if current_p and current_p.get('assets'):
+                    st.session_state.portfolio_tickers = list(current_p['assets'].keys())
+                else:
+                    st.session_state.portfolio_tickers = ["SPY", "QQQ"]
+
+            # Entrada interactiva con botón de validación externa
+            st.markdown("#### 🛡️ Introducir y Validar ETF")
+            st.caption("El Agente Guardián validará el ETF en tiempo real contra YFinance antes de añadirlo.")
+            col_add_ticker, col_add_btn = st.columns([2, 1])
+            with col_add_ticker:
+                added_ticker = st.text_input("Ticker de ETF a registrar", placeholder="Ej: VOO, GLD, TLT, IWM", key="add_new_etf_input").strip().upper()
+            with col_add_btn:
+                st.write("") # spacer para alinear
+                st.write("")
+                btn_confirm = st.button("🛡️ Validar y Añadir", use_container_width=True)
+                
+            if btn_confirm:
+                if not added_ticker:
+                    st.warning("⚠️ Escribe un ticker de ETF para que el Guardián pueda validarlo.")
+                elif added_ticker in st.session_state.portfolio_tickers:
+                    st.info(f"💡 El ETF {added_ticker} ya está incorporado en la lista de monitoreo.")
+                else:
+                    with st.spinner(f"Agente Guardián: Verificando {added_ticker} con YFinance..."):
+                        verify_data = get_global_data([added_ticker], True)
+                        if not verify_data.empty and any(col == added_ticker for col in verify_data.columns):
+                            st.session_state.portfolio_tickers.append(added_ticker)
+                            st.success(f"✅ ¡Agente Guardián validó con éxito {added_ticker}! Añadido.")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Error de Validación: El Agente Guardián no detectó '{added_ticker}' en YFinance o carece de cotización.")
+
+            # Mostrar y administrar los ETFs activos de forma interactiva
+            st.write("---")
+            st.markdown("#### 📂 Gestión de Monitoreo")
+            st.session_state.portfolio_tickers = st.multiselect(
+                "ETFs Registrados en Cartera",
+                options=st.session_state.portfolio_tickers,
+                default=st.session_state.portfolio_tickers,
+                help="Elimina ETFs haciendo clic en la 'x' de cada etiqueta."
+            )
+
             with st.form("portfolio_form_v8"):
-                st.info("Introduce los tickers de los ETFs que deseas monitorizar (ej: SPY, VOO, TLT, QQQ). El Agente Guardián validará cada entrada en tiempo real.")
-                
-                current_tickers_list = list(current_p['assets'].keys()) if (current_p and current_p.get('assets')) else []
-                manual_entry = st.text_area("Lista de ETFs (separados por coma)", 
-                                           value=", ".join(current_tickers_list) if current_tickers_list else "SPY, QQQ")
-                
-                tickers_to_process = [t.strip().upper() for t in manual_entry.split(",") if t.strip()]
-                
-                st.divider()
                 st.write("**Control de Participaciones**")
                 shares_input = {}
-                for t in tickers_to_process:
+                for t in st.session_state.portfolio_tickers:
                     # Buscamos si ya existía en el portafolio anterior
                     prev_data = current_p['assets'].get(t, {}) if current_p else {}
                     def_shares = float(prev_data.get('shares', 0.0)) if isinstance(prev_data, dict) else 0.0
@@ -440,11 +475,11 @@ elif menu == "Mi Portafolio":
                 cash_input = st.number_input("💵 Efectivo (Cash USD)", value=current_p.get('cash', 0.0) if current_p else 10000.0)
                 
                 if st.form_submit_button("🗄️ CONSOLIDAR CARTERA"):
-                    if not tickers_to_process:
+                    if not st.session_state.portfolio_tickers:
                         st.error("Protocolo Guardian: No has introducido ningún ticker para monitorizar.")
                     else:
                         with st.spinner("Guardián: Validando activos y sincronizando cotizaciones..."):
-                            all_req_t = list(set(tickers_to_process + ["SPY", "^VIX"]))
+                            all_req_t = list(set(st.session_state.portfolio_tickers + ["SPY", "^VIX"]))
                             new_data_df = get_global_data(all_req_t, True)
                             
                             if not new_data_df.empty:
