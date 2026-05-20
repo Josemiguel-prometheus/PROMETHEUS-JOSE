@@ -18,6 +18,10 @@ import plotly.graph_objects as go
 import lib.database_py as db_lib
 import lib.agents_py as agents_lib
 import lib.utils_py as utils_lib
+import importlib
+importlib.reload(db_lib)
+importlib.reload(agents_lib)
+importlib.reload(utils_lib)
 
 # Inicializar Base de Datos
 db_lib.init_db()
@@ -960,47 +964,62 @@ elif menu == "Historial & Aprendizaje":
         
         fig = go.Figure()
         
-        # Objective Line
+        # Accuracy Progress Curve with display mode="lines+markers+text" and text position "top center" for maximum legibility
+        fig.add_trace(go.Scatter(
+            x=evo_df["Iteración"], 
+            y=evo_df["Precisión (%)"], 
+            mode="lines+markers+text", 
+            name="Precisión Registrada",
+            text=[f"{val:.1f}%" for val in evo_df["Precisión (%)"]],
+            textposition="top center",
+            textfont=dict(color="#f97316", size=11, family="JetBrains Mono, monospace"),
+            line=dict(color="#f97316", width=4, shape="spline"),
+            marker=dict(size=10, color="#ffffff", line=dict(color="#f97316", width=3.5)),
+            hoverinfo="text",
+            hovertext=[f"Iteración {it}<br>Precisión: {val}%<br>Hito: {hito}" for it, val, hito in zip(evo_df["Iteración"], evo_df["Precisión (%)"], evo_df["Hito Operativo"])]
+        ))
+
+        # Objective Line (80% target) with high contrast red dash
         fig.add_trace(go.Scatter(
             x=evo_df["Iteración"], 
             y=[80.0] * 12, 
             mode="lines", 
-            name="Objetivo Institucional (80%)",
-            line=dict(color="#ef4444", width=1.5, dash="dash")
-        ))
-        
-        # Accuracy Progress Curve
-        fig.add_trace(go.Scatter(
-            x=evo_df["Iteración"], 
-            y=evo_df["Precisión (%)"], 
-            mode="lines+markers", 
-            name="Precisión Registrada",
-            line=dict(color="#f97316", width=3.5, shape="spline"),
-            marker=dict(size=9, color="#ffffff", line=dict(color="#f97316", width=2.5)),
-            text=evo_df["Hito Operativo"],
-            hovertemplate="<b>Calibración %{x}</b><br>Tasa de Acierto: %{y}%<br>Hito: %{text}<extra></extra>"
+            name="Objetivo Red (80.0%)",
+            line=dict(color="#ef4444", width=2, dash="dash"),
+            hoverinfo="none"
         ))
         
         fig.update_layout(
-            template="plotly_dark",
-            height=370,
-            margin=dict(t=20, b=30, l=15, r=15),
+            paper_bgcolor="#0c0c14",
+            plot_bgcolor="#0d0d16",
+            height=400,
+            margin=dict(t=35, b=45, l=45, r=30),
             xaxis=dict(
-                title="Iteración Calibrada", 
+                title=dict(text="ITERACIÓN CALIBRADA", font=dict(family="JetBrains Mono, monospace", size=11, color="#94a3b8")),
                 tickmode="linear", 
                 tick0=1, 
                 dtick=1,
-                gridcolor="#1e293b",
-                zerolinecolor="#1e293b"
+                gridcolor="#1e1b4b",
+                zerolinecolor="#1e1b4b",
+                tickfont=dict(family="JetBrains Mono, monospace", size=10, color="#94a3b8")
             ),
             yaxis=dict(
-                title="Precisión Predictiva (%)", 
-                range=[55, 85], 
-                gridcolor="#1e293b",
-                zerolinecolor="#1e293b"
+                title=dict(text="TASA DE ACIERTO (%)", font=dict(family="JetBrains Mono, monospace", size=11, color="#94a3b8")),
+                range=[55, 87], 
+                gridcolor="#1e1b4b",
+                zerolinecolor="#1e1b4b",
+                tickfont=dict(family="JetBrains Mono, monospace", size=10, color="#94a3b8")
             ),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
-            hovermode="x unified"
+            legend=dict(
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.02, 
+                xanchor="right", 
+                x=1, 
+                bgcolor="rgba(0,0,0,0)",
+                font=dict(family="JetBrains Mono, monospace", size=10, color="#94a3b8")
+            ),
+            hovermode="closest"
         )
         
         st.plotly_chart(fig, use_container_width=True)
