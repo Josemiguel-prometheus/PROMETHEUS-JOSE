@@ -199,6 +199,11 @@ class AgenteGuardian:
         return {"status": "OFFLINE", "vix": "N/A", "last_sync": "N/A", "msg": "Esperando enlace con YFinance..."}
 
     def generar_recomendaciones_asesor(self, info_vix=20):
+        try:
+            info_vix = float(info_vix)
+        except (ValueError, TypeError):
+            info_vix = 20.0
+            
         # Generar recomendaciones dinámicas basadas en los activos actuales
         recs = []
         if not self.portfolio:
