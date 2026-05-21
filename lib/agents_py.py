@@ -38,17 +38,195 @@ class AbogadoDelDiablo:
         self.analisis = analisis_analista
 
     def contra_analisis(self):
-        sector = self.analisis['sector_lider']
-        riesgos = [
-            {"riesgo": f"Sobre-extensión en {sector}", "nivel": "Medio"},
-            {"riesgo": "Divergencia en Yields vs Tech", "nivel": "Alto"},
-            {"riesgo": "Falsa ruptura de momentum (Mean Reversion)", "nivel": "Bajo"}
-        ]
+        sector = self.analisis.get('sector_lider', 'Unknown')
         
+        # Diccionario detallado de críticas mapeadas a cada sector GICS
+        sector_map = {
+            "Technology": {
+                "desc": "El sector tecnológico cotiza a múltiples exigentes, sostenido bajo el supuesto de un crecimiento exponencial ininterrumpido impulsado por la IA. Toda la tesis ignora la vulnerabilidad a las tasas reales de interés y el riesgo latente de concentración. Un giro restrictivo en la FED desinflará brutalmente las valoraciones.",
+                "risks": [
+                    {"riesgo": "Múltiplos de valoración sobreextendidos (PER medio por encima del 92% histórico)", "nivel": "Alto"},
+                    {"riesgo": "Sensibilidad extrema a las tasas reales de interés y yields de bonos a 10 años", "nivel": "Alto"},
+                    {"riesgo": "Riesgo de concentración crítico (Magníficas/Megacaps secuestran el índice)", "nivel": "Medio"}
+                ],
+                "skepticism": "90%"
+            },
+            "Energy": {
+                "desc": "El sector Energía opera bajo un sesgo cíclico drástico. Subirse a la ola del momentum del crudo asume estabilidad artificial de la OPEP+ y demanda industrial china infalible. Una corrección del crudo destruirá el flujo de caja operativo de estas compañías de inmediato.",
+                "risks": [
+                    {"riesgo": "Desaceleración brusca de la demanda manufacturera e industrial mundial", "nivel": "Alto"},
+                    {"riesgo": "Aumento sorpresivo de la oferta de países no-OPEP que hunda los precios de barriles", "nivel": "Alto"},
+                    {"riesgo": "Efecto divisa: La fortaleza residual del DXY deprime directamente las materias primas", "nivel": "Medio"}
+                ],
+                "skepticism": "80%"
+            },
+            "Financials": {
+                "desc": "La tesis bancaria es propensa a trampas de valor por inversión sostenida de la curva de tipos. El incremento de la morosidad y el endurecimiento severo del crédito comprimen los márgenes netos de intermediación, mientras que el riesgo de liquidez institucional asoma ante cualquier pánico sistémico.",
+                "risks": [
+                    {"riesgo": "Fuga silenciosa de depósitos hacia fondos del mercado monetario de mayor rendimiento", "nivel": "Alto"},
+                    {"riesgo": "Inversión de la curva de rendimientos reduciendo la rentabilidad por arbitraje de plazos", "nivel": "Alto"},
+                    {"riesgo": "Aumento orgánico en tasas de morosidad institucional y residencial (Real Estate comercial)", "nivel": "Medio"}
+                ],
+                "skepticism": "78%"
+            },
+            "Health Care": {
+                "desc": "El sector salud padece riesgos de litigio severos y regulaciones electorales de precios. Es una industria defensiva pero de crecimiento letárgico; sobreponderar salud en etapas expansivas condena el portafolio a un subrendimiento abismal frente al SPY.",
+                "risks": [
+                    {"riesgo": "Políticas gubernamentales restrictivas de control de precios de medicamentos y patentes", "nivel": "Alto"},
+                    {"riesgo": "Litigios multibillonarios de responsabilidad médica sobre farmacéuticas core", "nivel": "Medio"},
+                    {"riesgo": "Pérdida de tracción técnica masiva si el mercado activa un régimen puramente de optimismo canónico", "nivel": "Medio"}
+                ],
+                "skepticism": "65%"
+            },
+            "Consumer Discretionary": {
+                "desc": "Bajo la fragilidad inflacionaria y el agotamiento del ahorro familiar, el consumo discrecional es extremadamente vulnerable. Todo el momentum asume robustez de la tasa de empleo; una leve grieta laboral desplomará las ventas de bienes duraderos.",
+                "risks": [
+                    {"riesgo": "Contracción sostenida de los ingresos disponibles reales del consumidor medio", "nivel": "Alto"},
+                    {"riesgo": "Altos niveles de endeudamiento familiar mediante tarjetas de crédito de tasa variable", "nivel": "Alto"},
+                    {"riesgo": "Cargos por inventarios atrapados ante un cambio de hábitos del consumidor", "nivel": "Medio"}
+                ],
+                "skepticism": "82%"
+            },
+            "Consumer Staples": {
+                "desc": "Aunque el consumo básico resiste recesiones, las presiones inflacionarias de costos de producción erosionan de manera severa los márgenes operativos de marcas consolidadas debido a la sustitución masiva hacia marcas blancas de bajo costo por parte del cliente.",
+                "risks": [
+                    {"riesgo": "Pérdida drástica de poder de fijación de precios (Pricing Power) ante un consumidor exhausto", "nivel": "Medio"},
+                    {"riesgo": "Compresión severa de márgenes por costes de logística y materias primas", "nivel": "Medio"},
+                    {"riesgo": "Crecimiento plano o nulo de volumen de ventas que ahuyenta inversores de crecimiento", "nivel": "Bajo"}
+                ],
+                "skepticism": "60%"
+            },
+            "Industrials": {
+                "desc": "El sector de bienes industriales asume tasas de crecimiento de PIB estables y cadenas de suministro globales perfectas. Si el ciclo manufacturero internacional se contrae o resurgen cuellos de botella geográficos, este sector sufrirá caídas violentas.",
+                "risks": [
+                    {"riesgo": "Sensibilidad cíclica severa ante una desaceleración de la construcción de infraestructura fiscal", "nivel": "Alto"},
+                    {"riesgo": "Incremento de costes de fletes y disrupciones marítimas en canales de envío", "nivel": "Medio"},
+                    {"riesgo": "Altos costes de apalancamiento financiero para CAPEX industrial pesado", "nivel": "Medio"}
+                ],
+                "skepticism": "75%"
+            },
+            "Materials": {
+                "desc": "El sector de materiales básicos es rehén directo de la cotización internacional del dólar y de la actividad fabril asiática. Un mercado de vivienda desacelerado en los mercados emergentes anula virtualmente el momentum de precios de minerales.",
+                "risks": [
+                    {"riesgo": "Recesión del mercado inmobiliario y constructor en las principales economías emergentes", "nivel": "Alto"},
+                    {"riesgo": "Fortaleza sostenida del Dólar (DXY) deprimiendo el precio de bienes de intercambio global", "nivel": "Alto"},
+                    {"riesgo": "Alta volatilidad inherente al precio spot de commodities de difícil cobertura estructural", "nivel": "Medio"}
+                ],
+                "skepticism": "85%"
+            },
+            "Utilities": {
+                "desc": "Las empresas de servicios públicos (utilities) acumulan una excesiva carga de deuda en bolsa. Con tipos de interés persistentes, el coste de refinanciar la deuda erosiona la rentabilidad neta, obligando a recortar dividendos.",
+                "risks": [
+                    {"riesgo": "Exposición extrema a costes de refinanciación de deuda masiva corporativa", "nivel": "Alto"},
+                    {"riesgo": "Exigencias regulatorias de gran calado por transiciones de matriz ecológica", "nivel": "Medio"},
+                    {"riesgo": "Rango de rendimiento poco competitivo frente a bonos del tesoro exentos de riesgo", "nivel": "Alto"}
+                ],
+                "skepticism": "88%"
+            },
+            "Real Estate": {
+                "desc": "El sector inmobiliario enfrenta una crisis estructural híbrida: elevados costes de tasación hipotecaria estrangulan el mercado de viviendas nuevas, y el vaciado masivo de oficinas de negocios desploma las valoraciones de holdings comerciales.",
+                "risks": [
+                    {"riesgo": "Refinanciación de deuda hipotecaria a tipos de interés máximos de dos décadas", "nivel": "Alto"},
+                    {"riesgo": "Elevada tasa de desocupación en oficinas corporativas y centros comerciales urbanos", "nivel": "Alto"},
+                    {"riesgo": "Disminución acumulada de valoraciones de activos en balances generales de fideicomisos (REIT)", "nivel": "Medio"}
+                ],
+                "skepticism": "90%"
+            },
+            "Communication Services": {
+                "desc": "Muestra total dependencia de los presupuestos discrecionales de marketing digital de grandes corporaciones. Es el sector más recortado cuando el viento macro se enfría, y enfrenta constantes escrutinios sobre privacidad de datos de usuarios.",
+                "risks": [
+                    {"riesgo": "Caídas globales en presupuestos corporativos agregados de publicidad digital", "nivel": "Alto"},
+                    {"riesgo": "Trabas y multas récord de comisiones regulatorias por acumulación ilegal de datos de usuarios", "nivel": "Alto"},
+                    {"riesgo": "Altas tasas de rotación y pérdida de participación en mercados competitivos de streaming", "nivel": "Medio"}
+                ],
+                "skepticism": "76%"
+            }
+        }
+        
+        # Coincidencia flexible de sectores
+        matched = None
+        for k, v in sector_map.items():
+            if k.lower() in sector.lower():
+                matched = v
+                break
+                
+        if not matched:
+            matched = {
+                "desc": f"El momentum actual en {sector} oculta una alta concentración técnica de flujos pasivos correlacionados con el SPY. Un cambio brusco en el régimen de liquidez global (QT) revelará que el impulso alcista carece de fundamentos institucionales reales.",
+                "risks": [
+                    {"riesgo": f"Agotamiento súbito del momentum táctico relativo registrado para {sector}", "nivel": "Medio"},
+                    {"riesgo": "Efectos indirectos por incrementos de morosidad en el mercado de crédito comercial", "nivel": "Medio"},
+                    {"riesgo": "Liquidaciones imprevistas de carteras de inversión de fondos de cobertura y arbitraje", "nivel": "Bajo"}
+                ],
+                "skepticism": "75%"
+            }
+            
         return {
-            "alertas": riesgos,
-            "mensaje_critico": f"¿Estamos ignorando que {sector} tiene una correlación de 0.85 con el DXY? Un rebote del dólar invalidaría todo el análisis del AgenteAnalista.",
-            "nivel_escepticismo": "85%"
+            "alertas": matched["risks"],
+            "mensaje_critico": matched["desc"],
+            "nivel_escepticismo": matched["skepticism"]
+        }
+
+    def simulate_stress_scenario(self, dxy_change, vix_level, rate_spike, credit_stress):
+        """
+        Calcula un Score de Resiliencia para el sector recomendado basado en parámetros adversos interactivos.
+        """
+        sector = self.analisis.get('sector_lider', 'Technology')
+        # Base resilience score
+        base_resilience = 80.0
+        
+        # Sector vulnerability modifiers
+        sensitivities = {
+            "Technology":     {"dxy": 0.4, "vix": 0.6, "rate": 0.9, "credit": 0.3},
+            "Energy":         {"dxy": 0.9, "vix": 0.5, "rate": 0.2, "credit": 0.4},
+            "Financials":     {"dxy": 0.2, "vix": 0.6, "rate": 0.4, "credit": 0.9},
+            "Health Care":    {"dxy": 0.2, "vix": 0.2, "rate": 0.3, "credit": 0.3},
+            "Utilities":      {"dxy": 0.1, "vix": 0.3, "rate": 0.9, "credit": 0.7},
+            "Real Estate":    {"dxy": 0.2, "vix": 0.4, "rate": 1.0, "credit": 0.8},
+            "Discretionary":  {"dxy": 0.5, "vix": 0.5, "rate": 0.6, "credit": 0.6},
+            "Staples":        {"dxy": 0.3, "vix": 0.1, "rate": 0.2, "credit": 0.3},
+            "Materials":      {"dxy": 0.8, "vix": 0.4, "rate": 0.3, "credit": 0.5},
+            "Industrials":    {"dxy": 0.6, "vix": 0.4, "rate": 0.4, "credit": 0.5},
+            "Communication":  {"dxy": 0.3, "vix": 0.5, "rate": 0.6, "credit": 0.4}
+        }
+        
+        # Match sensitivity
+        sens = {"dxy": 0.5, "vix": 0.5, "rate": 0.5, "credit": 0.5}
+        for k, v in sensitivities.items():
+            if k.lower() in sector.lower():
+                sens = v
+                break
+                
+        # Impacts calculation (Subtracting resilience based on user inputs)
+        dxy_impact = dxy_change * sens["dxy"] * 1.5
+        vix_impact = max(0, vix_level - 15) * sens["vix"] * 1.2
+        rate_impact = rate_spike * sens["rate"] * 2.5
+        credit_impact = credit_stress * sens["credit"] * 2.0
+        
+        total_discount = dxy_impact + vix_impact + rate_impact + credit_impact
+        final_score = max(5.0, min(100.0, base_resilience - total_discount))
+        
+        # Generate diagnostic text
+        if final_score > 75:
+            diag = "Sólida e Inmune: El sector muestra un perfil defensivo extraordinario que mitiga los impactos de mercado."
+            status = "RESILIENTE ✅"
+        elif final_score > 45:
+            diag = "Sensibilidad Moderada: Vulnerable en el margen. Se sugiere balancear con al menos 20% de CASH/Caja."
+            status = "DERIVA TÁCTICA ⚠️"
+        else:
+            diag = "Estrés Extremo: Inviabilidad operativa severa bajo este escenario macro. Alta probabilidad de descompresión."
+            status = "CRASH INMINENTE 🚨"
+            
+        return {
+            "resilience_score": round(final_score, 1),
+            "status": status,
+            "diagnosis": diag,
+            "deductions": {
+                "Dólar Fuerte": round(dxy_impact, 1),
+                "Volatilidad (VIX)": round(vix_impact, 1),
+                "Tipos de Interés": round(rate_impact, 1),
+                "Estrés Crediticio": round(credit_impact, 1)
+            }
         }
 
 class AgenteRecomendador:

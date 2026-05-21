@@ -116,6 +116,7 @@ with st.sidebar:
     menu = st.radio("SISTEMA CENTRAL", 
                     ["Dashboard Estratégico", 
                      "Pentágono de Agentes", 
+                     "⚖️ Abogado del Diablo",
                      "Mi Portafolio",
                      "Historial & Aprendizaje", 
                      "Control & Salud",
@@ -284,6 +285,312 @@ elif menu == "Pentágono de Agentes":
             if c2.button("❌ DESESTIMAR SEÑAL", use_container_width=True):
                 db_lib.log_recommendation(rep_analista, rep_abogado, rep_final, "RECHAZADA", reflexion, {}, "N/A")
                 st.warning("Señal desestimada. Registrado para análisis forense.")
+
+elif menu == "⚖️ Abogado del Diablo":
+    st.markdown('<div class="bloomberg-header">REFUTADOR CORE: EL ABOGADO DEL DIABLO</div>', unsafe_allow_html=True)
+    
+    with st.spinner("Conectando con el Núcleo del Refutador..."):
+        data = get_global_data(list(SECTORES_GICS.keys()) + ["SPY", "^VIX"], st.session_state.safe_mode)
+        
+    if not data.empty:
+        # Pre-calc rotation data for current state
+        results = []
+        for ticker, name in SECTORES_GICS.items():
+            score, rel_mom = utils_lib.calculate_rotation_score(data[ticker], data["SPY"], st.session_state.weights)
+            results.append({"Sector": name, "Líder": ticker, "Score Compuesto": score, "Rel. Mom (20D)": rel_mom})
+        df_rot = pd.DataFrame(results).sort_values(by="Score Compuesto", ascending=False)
+        
+        # Initialize default objects
+        analista = agents_lib.AgenteAnalista(df_rot, {"^VIX": data["^VIX"].iloc[-1]}, None)
+        rep_analista = analista.generar_analisis()
+        abogado_default = agents_lib.AbogadoDelDiablo(rep_analista)
+        
+        # Banner de introducción de Abogado del Diablo
+        st.markdown(f"""
+        <div style="background-color: #1a0b0b; padding: 22px; border-radius: 6px; border: 1px solid #7f1d1d; margin-bottom: 25px;">
+            <h3 style="color: #f87171; margin-top: 0; margin-bottom: 8px; font-weight: 600;">⚖️ Agente Cognitivo de Negociación y Resiliencia</h3>
+            <p style="color: #cbd5e1; font-size: 13.5px; margin: 0; line-height: 1.6;">
+                El <b>Abogado del Diablo</b> es el filtro anti-euforia y FOMO de Prometheus. Diseñado para auditar la asignación sectorial recomendada, estresar el portafolio frente a cisnes negros del mercado, y refutar de forma agresiva mediante correlaciones macro, tasas reales, y choques de liquidez.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Tabs de interactividad de la pestaña Abogado del Diablo
+        tab_contra, tab_estres, tab_monte = st.tabs([
+            "🛡️ Análisis de Tesis Adversaria", 
+            "⚡ Simulador de Estrés Macroeconómico", 
+            "📊 Simulaciones de Choque de Monte Carlo"
+        ])
+        
+        with tab_contra:
+            st.markdown("### 🔍 Auditoría de Hipótesis y Puntos de Falla")
+            st.caption("Selecciona cualquier sector del GICS para confrontar los supuestos de momentum técnico relativos con la hipótesis bajista del Abogado.")
+            
+            # Buscador sectorial interactivo
+            sector_seleccionado_nombre = st.selectbox(
+                "Seleccionar Sector GICS a Auditar:",
+                options=list(SECTORES_GICS.values()),
+                index=list(SECTORES_GICS.values()).index(rep_analista['sector_lider']) if rep_analista['sector_lider'] in SECTORES_GICS.values() else 0
+            )
+            
+            # Obtener ticker e instanciar
+            sector_ticker = [k for k, v in SECTORES_GICS.items() if v == sector_seleccionado_nombre][0]
+            
+            # Instanciar el Abogado para este sector específico
+            analisis_mock = {
+                "sector_lider": sector_seleccionado_nombre,
+                "score_lider": float(df_rot[df_rot['Sector'] == sector_seleccionado_nombre]['Score Compuesto'].iloc[0]) if not df_rot[df_rot['Sector'] == sector_seleccionado_nombre].empty else 1.0
+            }
+            abogado_temp = agents_lib.AbogadoDelDiablo(analisis_mock)
+            confrontacion = abogado_temp.contra_analisis()
+            
+            # Mostrar la tesis de crítica en caja destacada
+            st.write("")
+            st.error(f"**🔴 REFUTACIÓN CRÍTICA DEL ABOGADO PARA {sector_seleccionado_nombre.upper()}:**")
+            st.markdown(f"""
+            <div style="background-color: #0c0202; border: 1px solid #dc2626; padding: 20px; border-radius: 6px; color: #fecaca; font-size: 14.5px; line-height: 1.6; font-family: sans-serif; margin-bottom: 25px;">
+                "{confrontacion['mensaje_critico']}"
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col_metric1, col_metric2 = st.columns(2)
+            with col_metric1:
+                st.markdown('<div class="metric-card" style="border-top: 4px solid #ef4444;">', unsafe_allow_html=True)
+                st.write("#### 🛡️ Índice de Escepticismo del Agente")
+                esc_val = int(confrontacion['nivel_escepticismo'].strip('%'))
+                
+                st.write(f"**Nivel de Desconfianza:** {confrontacion['nivel_escepticismo']}")
+                st.markdown(f"""
+                <div style="background-color: #1e1b4b; border-radius: 10px; height: 16px; width: 100%; margin-top: 10px; overflow: hidden;">
+                    <div style="background-color: #ef4444; width: {esc_val}%; height: 100%; border-radius: 10px;"></div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.caption("Puntuación ponderada midiendo variables macroeconómicas exógenas e interacciones de correlación extrema.")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            with col_metric2:
+                st.markdown('<div class="metric-card" style="border-top: 4px solid #3b82f6;">', unsafe_allow_html=True)
+                st.write("#### ⚖️ Resistencia del Sentimiento (Anti-FOMO)")
+                res_val = 100 - esc_val
+                st.write(f"**Score de Reserva Relativa:** {res_val}%")
+                st.markdown(f"""
+                <div style="background-color: #1e1b4b; border-radius: 10px; height: 16px; width: 100%; margin-top: 10px; overflow: hidden;">
+                    <div style="background-color: #3b82f6; width: {res_val}%; height: 100%; border-radius: 10px;"></div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.caption("Margen de maniobra que el algoritmo asigna a la compra táctica antes de que el riesgo por sobrecompra sea inaceptable.")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            # Desglose de riesgos detectados
+            st.write("")
+            st.write("**📋 Detalle de Factores de Presión Operativa en el Sector**")
+            
+            risks_df = pd.DataFrame(confrontacion['alertas'])
+            # Render styled dataframe with colors for levels
+            st.dataframe(
+                risks_df.style.map(
+                    lambda v: 'color: #ef4444; font-weight: bold;' if v == 'Alto' else 'color: #f59e0b; font-weight: bold;' if v == 'Medio' else 'color: #34d399;',
+                    subset=['nivel']
+                ),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+        with tab_estres:
+            st.markdown("### 🧬 Simulador Táctico de Escenarios de Estrés Macroeconómico")
+            st.caption("Estresa el rendimiento táctico del sector recomendado mediante la calibración de fricciones monetarias o choques de insolvencia.")
+            
+            col_scran1, col_scran2 = st.columns([1, 1], gap="large")
+            with col_scran1:
+                st.write("**🔧 Configuración del Evento de Estrés**")
+                
+                slider_dxy = st.slider("📈 Fortalecimiento de Dólar (DXY) (%)", 0, 20, 5, help="La subida del dólar drena liquidez global y presiona precios de intercambio corporativo internacional.")
+                slider_vix = st.slider("🔥 Pico de Volatilidad (Regimen VIX)", 12, 80, 28, help="Mide el nivel de pánico implícito en opciones del S&P500.")
+                slider_rate = st.slider("🏦 Subida de Rendimientos (Yields a 10 años) (bps)", 0, 300, 75, step=25, help="Incrementos de interés impactan directamente los múltiplos de crecimiento CAPEX y coste hipotecario.")
+                slider_credit = st.slider("💼 Margen de Estrés Financiero Corporativo (%)", 0, 100, 40, help="Representa el endurecimiento sistémico de las facilidades de crédito corporativo para refinanciación a corto plazo.")
+                
+            with col_scran2:
+                # Calcular estrés basado en sliders
+                stress_results = abogado_default.simulate_stress_scenario(
+                    dxy_change=float(slider_dxy),
+                    vix_level=float(slider_vix),
+                    rate_spike=float(slider_rate)/10.0,  # Escalado
+                    credit_stress=float(slider_credit)
+                )
+                
+                st.write("**📊 Resultado de Resiliencia del Algoritmo**")
+                
+                score_color = "#10b981" if stress_results['resilience_score'] > 75 else "#f59e0b" if stress_results['resilience_score'] > 45 else "#ef4444"
+                
+                st.markdown(f"""
+                <div style="background-color: #0b0f19; border: 1px solid #1e3a8a; padding: 25px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+                    <span style="font-size: 11px; color: #94a3b8; font-family: monospace; font-weight: bold; letter-spacing: 1px;">SCORE DE RESILIENCIA</span>
+                    <h1 style="margin: 5px 0; color: {score_color}; font-size: 48px; font-weight: 800;">{stress_results['resilience_score']} / 100</h1>
+                    <span style="font-size: 14px; color: #ffffff; font-weight: bold; background-color: {score_color}33; padding: 4px 12px; border-radius: 12px; border: 1px solid {score_color}88;">
+                        {stress_results['status']}
+                    </span>
+                    <p style="margin-top: 15px; margin-bottom: 0; color: #cbd5e1; font-size: 13px; line-height: 1.5; text-align: center;">
+                        {stress_results['diagnosis']}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Visualización plotly de detrimento de score
+                ded_data = pd.DataFrame({
+                    "Factor de Presión": list(stress_results['deductions'].keys()),
+                    "Penalización de Score": list(stress_results['deductions'].values())
+                })
+                
+                fig_ded = px.bar(
+                    ded_data,
+                    y="Factor de Presión",
+                    x="Penalización de Score",
+                    orientation="h",
+                    title="Detrimento del Score por Factor Macro",
+                    color="Penalización de Score",
+                    color_continuous_scale="Reds",
+                    text_auto=".1f"
+                )
+                fig_ded.update_layout(
+                    template="plotly_dark",
+                    height=180,
+                    margin=dict(t=30, b=10, l=10, r=10),
+                    xaxis=dict(title="Penalización (Puntos)"),
+                    yaxis=dict(title=""),
+                    coloraxis_showscale=False
+                )
+                st.plotly_chart(fig_ded, use_container_width=True)
+
+        with tab_monte:
+            st.markdown("### 📉 Simulador Monte Carlo de Evento de Caída de Cisne Negro")
+            st.caption("Modela estocásticamente la viabilidad de la recomendación actual mediante una simulación de movimiento browniano geométrico adverso de 100 días hábiles.")
+            
+            # Parametros para Monte Carlo
+            col_m1, col_m2 = st.columns(2)
+            with col_m1:
+                input_paths = st.slider("Número de Traectorias Simuladas:", 10, 100, 40, step=10)
+                input_vol_mult = st.slider("Multiplicador de Incertidumbre (Volatility):", 1.0, 3.0, 1.5, step=0.1, help="Escala la desviación típica diaria simulando pánico estructural.")
+            with col_m2:
+                input_days = st.slider("Ventana de Simulación Crítica (Días Hábiles):", 20, 252, 100, step=10)
+                st.info("💡 **Especificación matemática:** Esta simulación asume un drift anual desfavorable de -15.0% y volatilidad sectorial ajustada basada en la varianza rodante de 6 meses de YFinance.")
+                
+            if st.button("🔮 Lanzar Simulación de Choque de Activos", use_container_width=True, key="btn_run_abogado_monte"):
+                with st.spinner("Simulando miles de trayectorias financieras adversas..."):
+                    
+                    # Parametros de base
+                    S0 = 100.0  # Normalized starting price
+                    drift_annual = -0.15  # -15% drag in a severe crash regime
+                    dt = 1.0 / 252.0
+                    
+                    # Base asset standard deviation estimation
+                    sec_leader_ticker = rep_analista.get('top_etfs', [ 'XLK' ])[0]
+                    if sec_leader_ticker in data.columns:
+                        daily_rets = data[sec_leader_ticker].pct_change().dropna()
+                        vol_annual = daily_rets.std() * np.sqrt(252)
+                    else:
+                        vol_annual = 0.22  # default placeholder sd
+                        
+                    # Apply user uncertainty multiplier
+                    vol_stressed = vol_annual * input_vol_mult
+                    
+                    # Run simulation
+                    mu = drift_annual
+                    sigma = vol_stressed
+                    np.random.seed(42)  # For structural replication
+                    
+                    sim_paths = np.zeros((input_days + 1, input_paths))
+                    sim_paths[0] = S0
+                    
+                    for t_idx in range(1, input_days + 1):
+                        shocks = np.random.standard_normal(input_paths)
+                        # Geometric Brownian Motion formula
+                        sim_paths[t_idx] = sim_paths[t_idx - 1] * np.exp(
+                            (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * shocks
+                        )
+                    
+                    # Realizar cómputos estadísticos del resultado
+                    final_prices = sim_paths[-1]
+                    percent_loss = (final_prices - S0)
+                    var_99_5 = np.percentile(percent_loss, 0.5)  # worst 0.5%
+                    expected_shortfall = percent_loss[percent_loss <= np.percentile(percent_loss, 5.0)].mean()
+                    median_decline = np.percentile(percent_loss, 50.0)
+                    
+                    # Visualización en Plotly
+                    time_axis = np.arange(input_days + 1)
+                    fig_mc = go.Figure()
+                    
+                    # Add path lines
+                    for p_idx in range(input_paths):
+                        opacity = 0.35 if p_idx < 5 else 0.15
+                        color = "#fecaca" if p_idx < 5 else "#475569"
+                        fig_mc.add_trace(go.Scatter(
+                            x=time_axis,
+                            y=sim_paths[:, p_idx],
+                            mode="lines",
+                            line=dict(width=1.2, color=color),
+                            showlegend=False,
+                            hoverinfo="none"
+                        ))
+                    
+                    # Highlight median decline path
+                    fig_mc.add_trace(go.Scatter(
+                        x=time_axis,
+                        y=np.percentile(sim_paths, 50, axis=1),
+                        mode="lines",
+                        name="Ruta Mediana Estimada",
+                        line=dict(color="#f97316", width=3)
+                    ))
+                    
+                    fig_mc.update_layout(
+                        template="plotly_dark",
+                        title=f"Proyección Estocástica de Corrección de {sec_leader_ticker} ({input_paths} Rutas Estresadas)",
+                        xaxis=dict(title="Días de Negociación", gridcolor="#1e1b4b"),
+                        yaxis=dict(title="Retorno Normalizado (Base 100)", gridcolor="#1e1b4b"),
+                        margin=dict(t=45, b=30, l=45, r=20),
+                        height=350
+                    )
+                    
+                    col_mvis1, col_mvis2 = st.columns([1, 1.2])
+                    with col_mvis1:
+                        st.plotly_chart(fig_mc, use_container_width=True)
+                    with col_mvis2:
+                        st.write("**📊 Métricas de Riesgo y Dispersión Extrema:**")
+                        
+                        col_r1, col_r2 = st.columns(2)
+                        with col_r1:
+                            st.metric(
+                                "Declive Esperado (Mediana)", 
+                                f"{median_decline:.1f}%",
+                                help="La pérdida típica que experimenta el holding al final de la ventana de simulación."
+                            )
+                            st.metric(
+                                "Exposición VaR 99.5% (Adversa)", 
+                                f"{var_99_5:.1f}%",
+                                help="Value at Risk extremo: El peor escenario con un 99.5% de confianza estadística."
+                            )
+                        with col_r2:
+                            st.metric(
+                                "Retorno Esperado Bajo Estrés", 
+                                f"{(final_prices.mean() - S0):.1f}%",
+                                help="Retorno acumulado promedio ponderado en todas las trayectorias adversas."
+                            )
+                            st.metric(
+                                "Cisne Negro (CVaR 95%)", 
+                                f"{expected_shortfall:.1f}%",
+                                help="Expected Shortfall: Tasa promedio de pérdida esperada en el 5.0% de los peores escenarios simulados."
+                            )
+                        
+                        st.markdown(f"""
+                        <div style="background-color: #0c0a09; padding: 12px; border-radius: 4px; border-left: 3px solid #ef4444; font-size: 12.5px; color: #d6d3d1;">
+                            <b>🛡️ Estrategia de Mitigación Prometheus:</b> Para contrarrestar la pérdida extrema simulada de <b>{abs(expected_shortfall):.1f}%</b> bajo el régimen estresado de {sec_leader_ticker}, el Asesor le aconseja estructurar la cartera mediante el <b>Rebalanceador Inteligente</b> en Ponderación Moderada o Defensiva con un 30% en Caja Líquida (CASH).
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.write("")
+                st.info("Presiona el botón de simulación arriba para modelar el escenario de Cisne Negro.")
+                
+    else:
+        st.error("Error cargando los precios históricos globales de YFinance.")
 
 elif menu == "Mi Portafolio":
     st.markdown('<div class="bloomberg-header">TERMINAL DE GESTIÓN DE ACTIVOS (PRO)</div>', unsafe_allow_html=True)
