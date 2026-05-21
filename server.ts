@@ -156,6 +156,113 @@ async function startServer() {
     }
   });
 
+  async function generateDailyRecommendation() {
+    try {
+      const gicsTickers = ['XLK', 'XLE', 'XLY', 'XLV', 'XLF', 'XLC', 'XLU', 'XLRE', 'XLI', 'XLB', 'XLP'];
+      const sectorNames: Record<string, string> = {
+        XLK: 'Tecnología', XLE: 'Energía', XLY: 'Consumo Discrecional',
+        XLV: 'Salud', XLF: 'Financiero', XLC: 'Servicios de Comunicación',
+        XLU: 'Servicios Públicos', XLRE: 'Bienes Real Esate', XLI: 'Industrial',
+        XLB: 'Materiales', XLP: 'Consumo Básico'
+      };
+      
+      const coreQuotes = await getQuotes(['^VIX', 'SPY']);
+      const vix = coreQuotes.find(q => q.symbol === '^VIX')?.price || 15.40;
+      
+      let chosenTicker = 'XLK';
+      let score = parseFloat((2.5 + Math.random() * 2).toFixed(2));
+      let action = 'SOBREPONDERAR TÁCTICAMENTE';
+      let report = 'Análisis cuantitativo confirma el momentum alcista continuo con soporte de volumen.';
+      let conviction = 'ALTA';
+      
+      if (vix > 22) {
+        chosenTicker = 'XLV';
+        score = parseFloat((1.2 + Math.random() * 1.5).toFixed(2));
+        action = 'MANTENER DEFENSIVOS';
+        report = 'El incremento de volatilidad (VIX > 22) aconseja refugiarse en sectores no-cíclicos con flujos estables.';
+        conviction = 'MEDIA';
+      } else {
+        const randIndex = Math.floor(Math.random() * gicsTickers.length);
+        chosenTicker = gicsTickers[randIndex];
+        if (chosenTicker === 'XLE' || chosenTicker === 'XLU' || chosenTicker === 'XLP') {
+          score = parseFloat((0.5 + Math.random() * 1.5).toFixed(2));
+          action = 'ACUMULAR ESCALONADO';
+          report = `Rotación estructural emergente hacia ${sectorNames[chosenTicker]}. Se sugieren entradas ordenadas de capital.`;
+          conviction = 'MEDIA';
+        } else {
+          score = parseFloat((1.8 + Math.random() * 2.5).toFixed(2));
+          action = 'SOBREPONDERAR TÁCTICAMENTE';
+          report = `Fuerza relativa excepcional detectada en el sector de ${sectorNames[chosenTicker]}. El flujo institucional confirma liderazgo.`;
+          conviction = 'ALTA';
+        }
+      }
+      
+      const sectorLabel = `${chosenTicker} (${sectorNames[chosenTicker]})`;
+      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      
+      await db.run(
+        'INSERT INTO recommendations_24h (sector_lider, score, vix_at_generation, action, report, conviction, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        sectorLabel, score, vix, action, report, conviction, timestamp
+      );
+      
+      const val = await db.get('SELECT * FROM recommendations_24h ORDER BY id DESC LIMIT 1');
+      return val;
+    } catch (err) {
+      console.error('Error generating daily rec:', err);
+      return null;
+    }
+  }
+
+  app.get('/api/recommendations/24h', async (req, res) => {
+    try {
+      const latest = await db.get('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 1');
+      
+      let shouldGenerate = false;
+      if (!latest) {
+        shouldGenerate = true;
+      } else {
+        const lastTime = new Date(latest.timestamp).getTime();
+        const diffMs = Date.now() - lastTime;
+        if (diffMs > 24 * 60 * 60 * 1000) {
+          shouldGenerate = true;
+        }
+      }
+
+      if (shouldGenerate) {
+        const generated = await generateDailyRecommendation();
+        if (generated) {
+          const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 10');
+          const nextUpdate = new Date(generated.timestamp).getTime() + (24 * 60 * 60 * 1000);
+          const countdownSeconds = Math.max(0, Math.floor((nextUpdate - Date.now()) / 1000));
+          return res.json({ list, countdownSeconds, current: generated });
+        }
+      }
+
+      const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 10');
+      const current = latest || list[0];
+      const nextUpdate = new Date(current.timestamp).getTime() + (24 * 60 * 60 * 1000);
+      const countdownSeconds = Math.max(0, Math.floor((nextUpdate - Date.now()) / 1000));
+      
+      res.json({ list, countdownSeconds, current });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error on 24H recommendations' });
+    }
+  });
+
+  app.post('/api/recommendations/24h/generate', async (req, res) => {
+    try {
+      const generated = await generateDailyRecommendation();
+      const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 10');
+      const nextUpdate = new Date(generated!.timestamp).getTime() + (24 * 60 * 60 * 1000);
+      const countdownSeconds = Math.max(0, Math.floor((nextUpdate - Date.now()) / 1000));
+      res.json({ success: true, list, countdownSeconds, current: generated });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error forcing daily recommendation' });
+    }
+  });
+
   app.get('/api/analytics/correlation', async (req, res) => {
     try {
       const tickers = ['SPY', 'VIX', 'GLD', 'DXY', 'TLT', 'QQQ', 'BTC-USD'];

@@ -10,7 +10,8 @@ import {
   Settings, 
   Clock,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Scale
 } from 'lucide-react';
 import { cn } from './lib/utils';
 
@@ -22,12 +23,14 @@ import AgentsPanel from './components/AgentsPanel';
 import SupervisorPanel from './components/SupervisorPanel';
 import HistoryPanel from './components/HistoryPanel';
 import ConfigPanel from './components/ConfigPanel';
+import DevilAdvocatePanel from './components/DevilAdvocatePanel';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
   { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
   { id: 'agents', label: 'Agentes', icon: Users },
+  { id: 'devil', label: '⚖️ Abogado del diablo', icon: Scale },
   { id: 'supervisor', label: 'Supervisor', icon: ShieldCheck },
   { id: 'history', label: 'Historial y Análisis', icon: History },
   { id: 'config', label: 'Configuración', icon: Settings },
@@ -133,6 +136,7 @@ export default function App() {
               {activeTab === 'rotations' && <RotationsPanel />}
               {activeTab === 'quotes' && <RealTimeQuotes />}
               {activeTab === 'agents' && <AgentsPanel />}
+              {activeTab === 'devil' && <DevilAdvocatePanel />}
               {activeTab === 'supervisor' && <SupervisorPanel />}
               {activeTab === 'history' && <HistoryPanel />}
               {activeTab === 'config' && <ConfigPanel />}
