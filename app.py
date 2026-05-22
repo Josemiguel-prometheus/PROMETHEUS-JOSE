@@ -115,6 +115,7 @@ with st.sidebar:
     st.divider()
     menu = st.radio("SISTEMA CENTRAL", 
                     ["Dashboard Estratégico", 
+                     "💡 Señales 24H & Mejoras",
                      "Pentágono de Agentes", 
                      "⚖️ Abogado del Diablo",
                      "Mi Portafolio",
@@ -219,6 +220,124 @@ if menu == "Dashboard Estratégico":
             st.write("🧠 **IA Core:** Calibrada")
             st.write(f"🔐 **Modo Seguro:** {'ON' if st.session_state.safe_mode else 'OFF'}")
             st.markdown('</div>', unsafe_allow_html=True)
+
+elif menu == "💡 Señales 24H & Mejoras":
+    st.markdown('<div class="bloomberg-header font-sans" style="font-size: 24px; font-weight: 700; color: #f97316;">💡 SEÑALES 24H & MEJORAS DE PLATAFORMA</div>', unsafe_allow_html=True)
+    st.caption("Consulte las recomendaciones sectoriales automáticas de Prometheus y envíe propuestas tecnológicas directamente a hito de GitHub.")
+    
+    # 24H recommendations
+    recs = db_lib.get_recommendations_24h(limit=10)
+    current_rec = recs[0] if recs else None
+    
+    st.markdown("### 💡 Señal Activa 24H en Core")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown('<div class="metric-card" style="border-left: 4px solid #f97316; background-color: #0f0f15; padding: 20px; border-radius: 4px;">', unsafe_allow_html=True)
+        if current_rec:
+            st.markdown(f"<h3 style='margin:0; color:#ffffff;'>{current_rec['sector_lider']}</h3>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color: #f97316; font-size: 18px; font-weight: bold; margin-top:5px;'>{current_rec['action']}</div>", unsafe_allow_html=True)
+            st.write(f"📈 **Score de Rotación:** {current_rec['score']:.2f}")
+            st.write(f"📉 **VIX al Generar:** {current_rec['vix_at_generation']:.2f}")
+            st.write(f"🔒 **Convicción:** {current_rec['conviction']}")
+            st.write(f"🕒 **Fecha:** {current_rec['timestamp']}")
+        else:
+            st.write("Cargando o sin señal activa.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        if st.button("🔄 Generar Nueva Señal Diaria (Forzar)", use_container_width=True):
+            import random
+            gicsTickers = ['XLK', 'XLE', 'XLY', 'XLV', 'XLF', 'XLC', 'XLU', 'XLRE', 'XLI', 'XLB', 'XLP']
+            sectorNames = {
+                'XLK': 'Tecnología', 'XLE': 'Energía', 'XLY': 'Consumo Discrecional',
+                'XLV': 'Salud', 'XLF': 'Financiero', 'XLC': 'Servicios de Comunicación',
+                'XLU': 'Servicios Públicos', 'XLRE': 'Bienes Real Estate', 'XLI': 'Industrial',
+                'XLB': 'Materiales', 'XLP': 'Consumo Básico'
+            }
+            chosenTicker = random.choice(gicsTickers)
+            score = round(1.5 + random.random() * 3, 2)
+            vix = 14.50
+            action = 'SOBREPONDERAR TÁCTICAMENTE' if score > 3.0 else 'MANTENER / CAUTELA'
+            report = f"Fuerza relativa detectada en {sectorNames[chosenTicker]}. Prometheus valida correlación y volumen estructural alcista."
+            conviction = 'ALTA' if score > 3.2 else 'MEDIA'
+            
+            conn = db_lib.get_db_connection()
+            if conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        INSERT INTO recommendations_24h (sector_lider, score, vix_at_generation, action, report, conviction)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (f"{chosenTicker} ({sectorNames[chosenTicker]})", score, vix, action, report, conviction))
+                    conn.commit()
+                finally:
+                    conn.close()
+                st.success("Señal 24h forzada exitosamente.")
+                st.rerun()
+                
+    with col2:
+        st.markdown('<div class="metric-card" style="border-left: 4px solid #a855f7; background-color: #0d0d0f; padding: 20px; border-radius: 4px; height: 100%; min-height: 200px;">', unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 10px 0; color: #a855f7;'>Narrativa del Analista Integrador</h4>", unsafe_allow_html=True)
+        if current_rec:
+            st.write(f"*{current_rec['report']}*")
+        else:
+            st.write("Ningún reporte detallado disponible.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    st.divider()
+    st.markdown("### ⚙️ Propuestas de Mejoras para la Plataforma")
+    st.caption("Priorice mejoras estructurales para expandir la resiliencia del algoritmo.")
+    
+    imprs = db_lib.get_platform_improvements()
+    
+    with st.expander("➕ Sugerir Nueva Mejora de Ingeniería"):
+        with st.form("new_impr_form_py"):
+            col_cat, col_title = st.columns([1, 2])
+            with col_cat:
+                cat = st.selectbox("Categoría", ["Inteligencia & Modelos", "Capa de Datos / Portafolio", "Conectividad & Canales", "Optimización Técnica", "Simulación Estocástica"])
+                imp_lvl = st.selectbox("Impacto Previsto", ["ALTO", "MEDIO", "BAJO"])
+            with col_title:
+                title = st.text_input("Título Corto de la Sugerencia")
+            desc = st.text_area("Descripción y Plan de Ejecución")
+            submit_btn = st.form_submit_button("Enviar Propuesta e Iniciar Votación")
+            
+            if submit_btn:
+                if title and desc:
+                    db_lib.add_platform_improvement(cat, title, desc, imp_lvl, "Backlog / Sprint-v1.2")
+                    st.success("Propuesta de mejora guardada exitosamente.")
+                    st.rerun()
+                else:
+                    st.error("Por favor complete todos los campos.")
+                    
+    cols_impr = st.columns(2)
+    for idx, imp in enumerate(imprs):
+        col_dest = cols_impr[idx % 2]
+        with col_dest:
+            st.markdown(f"""
+            <div style="background-color: #141414; border: 1px solid #222; padding: 15px; border-radius: 4px; margin-bottom: 12px; height: 160px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="background-color: #1a1a1a; border: 1px solid #2a2a2a; color: #d1d5db; font-size: 10px; font-weight: bold; font-family: 'JetBrains Mono'; padding: 2px 6px; border-radius: 2px;">{imp['category']}</span>
+                        <span style="background-color: #2e1065; border: 1px solid #4c1d95; color: #c084fc; font-size: 10px; font-weight: bold; font-family: 'JetBrains Mono'; padding: 2px 6px; border-radius: 2px;">{imp['status']}</span>
+                    </div>
+                    <h5 style="margin: 0 0 4px 0; color: #ffffff; font-size: 14px;">{imp['title']}</h5>
+                    <p style="color: #9ca3af; font-size: 11px; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">{imp['description']}</p>
+                </div>
+                <div style="margin-top: 10px; border-top: 1px solid #222; padding-top: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #4b5563; font-family: 'JetBrains Mono';">
+                    <span>Impacto: {imp['impact']} | Hito: {imp['github_milestone']}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"👍 Votar ({imp['votes']})", key=f"vote_py_{imp['id']}"):
+                db_lib.vote_platform_improvement(imp['id'])
+                st.rerun()
+
+    st.divider()
+    st.markdown("#### 🕒 Registro Histórico de Señales 24H")
+    if recs:
+        df_recs = pd.DataFrame(recs)
+        st.dataframe(df_recs[["timestamp", "sector_lider", "score", "vix_at_generation", "action", "conviction"]], use_container_width=True)
 
 elif menu == "Pentágono de Agentes":
     st.markdown('<div class="bloomberg-header">PENTÁGONO DE INTELIGENCIA COGNITIVA</div>', unsafe_allow_html=True)

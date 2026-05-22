@@ -86,6 +86,66 @@ def init_db():
             reason TEXT
         )
     ''')
+
+    # Tabla de Recomendaciones 24h
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS recommendations_24h (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            sector_lider TEXT,
+            score REAL,
+            vix_at_generation REAL,
+            action TEXT,
+            report TEXT,
+            conviction TEXT
+        )
+    ''')
+
+    # Tabla de Mejoras de Plataforma
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS platform_improvements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT,
+            title TEXT,
+            description TEXT,
+            votes INTEGER DEFAULT 0,
+            status TEXT,
+            impact TEXT,
+            github_milestone TEXT
+        )
+    ''')
+    
+    # Semillar recommendations_24h si está vacía
+    cursor.execute("SELECT count(*) FROM recommendations_24h")
+    if cursor.fetchone()[0] == 0:
+        historical_recs = [
+            ('XLK (Tecnología)', 3.84, 13.52, 'SOBREPONDERAR TÁCTICAMENTE', 'Alta fuerza de momentum en semiconductores soportada por flujos estructurales y volumen ascendente.', 'ALTA', '2026-05-17 12:00:00'),
+            ('XLE (Energía)', 1.42, 17.80, 'MANTENER / CAUTELA', 'Presión geopolítica elevando crudo, pero la volatilidad intradiaria aconseja no incrementar ponderación.', 'MEDIA', '2026-05-18 12:00:00'),
+            ('XLY (Consumo)', -0.85, 14.10, 'REDUCIR POSICIONES', 'Debilidad en ventas core del consumidor e índices de crédito ajustados. Desplazar hacia defensivos.', 'BAJA', '2026-05-19 12:00:00'),
+            ('XLV (Salud)', 2.10, 18.25, 'SOBREPONDERAR DEFENSIVOS', 'El aumento del VIX sugiere rotación defensiva hacia salud tradicional. Spread de dividendo atractivo.', 'MEDIA', '2026-05-20 12:00:00')
+        ]
+        for rec in historical_recs:
+            cursor.execute('''
+                INSERT INTO recommendations_24h (sector_lider, score, vix_at_generation, action, report, conviction, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', rec)
+
+    # Semillar platform_improvements si está vacía
+    cursor.execute("SELECT count(*) FROM platform_improvements")
+    if cursor.fetchone()[0] == 0:
+        default_improvements = [
+            ('Inteligencia & Modelos', 'Módulo Avanzado de Backtesting Bayesiano', 'Permite simular la efectividad de la rotación sectorial táctica frente a un portafolio Buy & Hold estático de SPY.', 42, 'APROBADO', 'ALTO', 'Sprint-v1.1'),
+            ('Conectividad & Canales', 'Suscripción Inmediata Webhook / Telegram', 'Enviar señales tácticas de 24h directamente a canales de comunicación automatizados o carteras de auto-trading.', 19, 'SUGESTIÓN', 'MEDIO', 'Backlog'),
+            ('Capa de Datos / Portafolio', 'Soporte de Cartera sin Fracciones de Títulos', 'Modificar el optimizador del Asesor de Rebalanceo para calcular lotes completos de ETFs según mínimos configurables.', 11, 'SUGESTIÓN', 'MEDIO', 'Backlog'),
+            ('Optimización Técnica', 'Caché de Cotizaciones de Yahoo Finance', 'Mitigar limitaciones de tasa de la API de Yahoo Finance mediante pre-cacheo local de 60 segundos en transacciones concurrentes.', 55, 'IMPLEMENTADO', 'ALTO', 'Sprint-v1.0'),
+            ('Simulación Estocástica', 'Pruebas de Estrés Basadas en Eventos Históricos', 'Integrar choques históricos reales (Pandemia 2020, Subprime 2008, Burbuja Dotcom) directamente al simulador del Abogado del Diablo.', 31, 'APROBADO', 'ALTO', 'Sprint-v1.1'),
+            ('Seguridad de Datos', 'Control de Auditoría y Logs de Transacciones', 'Registro persistente de decisiones del supervisor ante variaciones rápidas de volatilidad interbancaria.', 8, 'SUGESTIÓN', 'BAJO', 'Backlog')
+        ]
+        for imp in default_improvements:
+            cursor.execute('''
+                INSERT INTO platform_improvements (category, title, description, votes, status, impact, github_milestone)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', imp)
     
     conn.commit()
     conn.close()
@@ -173,3 +233,61 @@ def backup_database():
     except Exception as e:
         log_system_event("ERROR", "Database", f"Fallo en backup: {str(e)}")
     return False
+
+
+def get_recommendations_24h(limit=10):
+    conn = get_db_connection()
+    if not conn: return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT ?", (limit,))
+        cols = [column[0] for column in cursor.description]
+        results = []
+        for row in cursor.fetchall():
+            results.append(dict(zip(cols, row)))
+        return results
+    finally:
+        conn.close()
+
+
+def get_platform_improvements():
+    conn = get_db_connection()
+    if not conn: return []
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM platform_improvements ORDER BY votes DESC, id DESC")
+        cols = [column[0] for column in cursor.description]
+        results = []
+        for row in cursor.fetchall():
+            results.append(dict(zip(cols, row)))
+        return results
+    finally:
+        conn.close()
+
+
+def vote_platform_improvement(item_id):
+    conn = get_db_connection()
+    if not conn: return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE platform_improvements SET votes = votes + 1 WHERE id = ?", (item_id,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def add_platform_improvement(category, title, description, impact, github_milestone="Backlog"):
+    conn = get_db_connection()
+    if not conn: return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO platform_improvements (category, title, description, votes, status, impact, github_milestone)
+            VALUES (?, ?, ?, 1, 'SUGESTIÓN', ?, ?)
+        """, (category, title, description, impact, github_milestone))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
