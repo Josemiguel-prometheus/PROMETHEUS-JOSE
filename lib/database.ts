@@ -51,12 +51,43 @@ export async function initDb() {
       report TEXT,
       conviction TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS platform_improvements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT,
+      title TEXT,
+      description TEXT,
+      votes INTEGER DEFAULT 0,
+      status TEXT,
+      impact TEXT,
+      github_milestone TEXT
+    );
   `);
 
   // Seed default weights if not present
   await db.run("INSERT OR IGNORE INTO config (key, value) VALUES ('rotation_weight_momentum', '0.6')");
   await db.run("INSERT OR IGNORE INTO config (key, value) VALUES ('rotation_weight_volatility', '0.2')");
   await db.run("INSERT OR IGNORE INTO config (key, value) VALUES ('rotation_weight_volume', '0.2')");
+
+  // Seed platform_improvements if empty
+  const imprCountRow = await db.get('SELECT count(*) as count FROM platform_improvements');
+  const imprCount = imprCountRow ? (imprCountRow as any).count : 0;
+  if (imprCount === 0) {
+    const defaultImprovements = [
+      ['Inteligencia & Modelos', 'Módulo Avanzado de Backtesting Bayesiano', 'Permite simular la efectividad de la rotación sectorial táctica frente a un portafolio Buy & Hold estático de SPY.', 42, 'APROBADO', 'ALTO', 'Sprint-v1.1'],
+      ['Conectividad & Canales', 'Suscripción Inmediata Webhook / Telegram', 'Enviar señales tácticas de 24h directamente a canales de comunicación automatizados o carteras de auto-trading.', 19, 'SUGESTIÓN', 'MEDIO', 'Backlog'],
+      ['Capa de Datos / Portafolio', 'Soporte de Cartera sin Fracciones de Títulos', 'Modificar el optimizador del Asesor de Rebalanceo para calcular lotes completos de ETFs según mínimos configurables.', 11, 'SUGESTIÓN', 'MEDIO', 'Backlog'],
+      ['Optimización Técnica', 'Caché de Cotizaciones de Yahoo Finance', 'Mitigar limitaciones de tasa de la API de Yahoo Finance mediante pre-cacheo local de 60 segundos en transacciones concurrentes.', 55, 'IMPLEMENTADO', 'ALTO', 'Sprint-v1.0'],
+      ['Simulación Estocástica', 'Pruebas de Estrés Basadas en Eventos Históricos', 'Integrar choques históricos reales (Pandemia 2020, Subprime 2008, Burbuja Dotcom) directamente al simulador del Abogado del Diablo.', 31, 'APROBADO', 'ALTO', 'Sprint-v1.1'],
+      ['Seguridad de Datos', 'Control de Auditoría y Logs de Transacciones', 'Registro persistente de decisiones del supervisor ante variaciones rápidas de volatilidad interbancaria.', 8, 'SUGESTIÓN', 'BAJO', 'Backlog']
+    ];
+    for (const imp of defaultImprovements) {
+      await db.run(
+        'INSERT INTO platform_improvements (category, title, description, votes, status, impact, github_milestone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        imp[0], imp[1], imp[2], imp[3], imp[4], imp[5], imp[6]
+      );
+    }
+  }
 
   // Seed recommendations_24h if empty
   const recCountRow = await db.get('SELECT count(*) as count FROM recommendations_24h');

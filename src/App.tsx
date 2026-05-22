@@ -24,9 +24,11 @@ import SupervisorPanel from './components/SupervisorPanel';
 import HistoryPanel from './components/HistoryPanel';
 import ConfigPanel from './components/ConfigPanel';
 import DevilAdvocatePanel from './components/DevilAdvocatePanel';
+import Recommendations24hPanel from './components/Recommendations24hPanel';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
+  { id: 'recommendations24h', label: '💡 Señales 24H & Mejoras', icon: Clock },
   { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
   { id: 'agents', label: 'Agentes', icon: Users },
@@ -133,6 +135,7 @@ export default function App() {
               className="p-8 max-w-7xl mx-auto"
             >
               {activeTab === 'dashboard' && <Dashboard />}
+              {activeTab === 'recommendations24h' && <Recommendations24hPanel />}
               {activeTab === 'rotations' && <RotationsPanel />}
               {activeTab === 'quotes' && <RealTimeQuotes />}
               {activeTab === 'agents' && <AgentsPanel />}

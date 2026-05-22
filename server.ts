@@ -299,6 +299,53 @@ async function startServer() {
     }
   });
 
+  // Platform Improvements Endpoints
+  app.get('/api/platform/improvements', async (req, res) => {
+    try {
+      const improvements = await db.all('SELECT * FROM platform_improvements ORDER BY votes DESC, id DESC');
+      res.json(improvements);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error fetching platform improvements' });
+    }
+  });
+
+  app.post('/api/platform/improvements/vote', async (req, res) => {
+    const { id } = req.body;
+    try {
+      await db.run('UPDATE platform_improvements SET votes = votes + 1 WHERE id = ?', id);
+      const updated = await db.get('SELECT * FROM platform_improvements WHERE id = ?', id);
+      res.json({ success: true, updated });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error upvoting improvement' });
+    }
+  });
+
+  app.post('/api/platform/improvements/add', async (req, res) => {
+    const { category, title, description, impact, github_milestone } = req.body;
+    try {
+      if (!title || !description) {
+        return res.status(400).json({ error: 'Faltan campos obligatorios' });
+      }
+      await db.run(
+        'INSERT INTO platform_improvements (category, title, description, status, impact, github_milestone, votes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        category || 'Sugerido por Usuario',
+        title,
+        description,
+        'SUGESTIÓN',
+        impact || 'MEDIO',
+        github_milestone || 'Backlog',
+        1
+      );
+      const list = await db.all('SELECT * FROM platform_improvements ORDER BY votes DESC, id DESC');
+      res.json({ success: true, list });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error adding custom improvement' });
+    }
+  });
+
   app.post('/api/refresh', async (req, res) => {
     try {
       // Manually trigger agent cycle
