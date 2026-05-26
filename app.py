@@ -116,92 +116,94 @@ if "chat_history_py" not in st.session_state:
 def generate_heuristic_response_py(last_user_msg, db_recs, db_imprs):
     query = last_user_msg.lower()
     header_notice = (
-        "⚠️ **[MODO DE RESPALDO DE INTELIGENCIA LOCAL - PROMETHEUS COGNITIVE]**\n"
-        "*La clave de entorno `GEMINI_API_KEY` no está configurada en la pestaña Settings de AI Studio.* "
-        "Para habilitar la capacidad ilimitada de razonamiento cognitivo y debate abierto con modelos de Gemini (flash 3.5), "
-        "ingrese la clave correspondiente en la pestaña 'Settings' de AI Studio. Entretanto, el **Motor Heurístico de Negocios** "
-        "local ha procesado su consulta usando el contexto real de la base de datos:\n\n---\n\n"
+        "⚠️ **[MODO DE RESPALDO DE INTELIGENCIA LOCAL - PROMETHEUS COGNITIVE EXPERT]**\n"
+        "*La clave de entorno `GEMINI_API_KEY` no está configurada actualmente.* "
+        "Para habilitar razonamiento ilimitado y debate estocástico fluido con Gemini Pro/Flash, "
+        "ingrese la clave correspondiente en la pestaña 'Settings' de AI Studio. Entretanto, el **Motor Heurístico de Arquitectura** "
+        "local procesará su consulta técnica utilizando el contexto del sistema:\n\n---\n\n"
     )
 
-    if "macro" in query or "volatilidad" in query or "reporte" in query or "señal" in query or "regimen" in query or "vix" in query:
-        current_signal = db_recs[0] if db_recs and len(db_recs) > 0 else None
-        signal_details = ""
-        if current_signal:
-            signal_details = (
-                f"- **Sector Líder**: `{current_signal.get('sector_lider', 'XLK (Tecnología)')}`\n"
-                f"- **Puntuación de Fuerza**: `{current_signal.get('score', '3.84')}`\n"
-                f"- **Nivel de Volatilidad (VIX)**: `{current_signal.get('vix_at_generation', '13.52')}`\n"
-                f"- **Acción Recomendada**: **{current_signal.get('action', 'SOBREPONDERAR TÁCTICAMENTE')}**\n"
-                f"- **Nivel de Convicción**: **{current_signal.get('conviction', 'ALTA')}**\n\n"
-                f"> **Informe de Señales**: *\"{current_signal.get('report', 'Alta fuerza de momentum.')}\"*\n\n"
-            )
-        else:
-            signal_details = "*No hay señales tácticas en el histórico de base de datos en este instante.*\n\n"
-
+    if "arquitectura" in query or "pila" in query or "files" in query or "código" in query or "codigo" in query or "server" in query or "app" in query:
         return header_notice + (
-            "### 📊 ANÁLISIS MACROECONÓMICO Y ESTUDIO DE VOLATILIDAD INTERBANCARIA\n\n"
-            f"{signal_details}"
-            "#### CORRELACIONES ESTRUCTURALES GICS\n"
-            "Bajo el nivel de volatilidad actual, las ponderaciones tácticas de Prometheus se modelan con un sesgo hacia la reducción de riesgo sistemático. "
-            "Cuando el VIX supera los 20 puntos, los sectores cíclicos como Tecnología (**XLK**) y Consumo Discrecional (**XLY**) enfrentan un incremento del costo promedio ponderado de capital (WACC), motivando una rotación defensiva hacia Consumo Básico (**XLP**), Salud (**XLV**) y Servicios Públicos (**XLU**).\n\n"
-            "#### PERSPECTIVA DEL COPILOTO IA\n"
-            "1. **Régimen de Volatilidad**: El nivel actual indica que estamos en un punto medio donde el mercado evalúa la velocidad de la desinflación.\n"
-            "2. **Táctica Recomendada**: Mantener el límite de rebalanceo semanal activo. La sobreponderación de sectores defensivos amortigua las contracciones de múltiplos de valoración."
+            "### 📂 ARQUITECTURA TÉCNICA Y MAPA DE ARCHIVOS DE PROMETHEUS\n\n"
+            "Como Copiloto Experto de la Plataforma, aquí tienes el desglose estructural de nuestro espacio de trabajo:\n\n"
+            "1. **Capas de Frontend & Servidor Unificado (`server.ts` & `vite.config.ts`)**:\n"
+            "   - Servidor unificado escrito en TypeScript usando **Express**. En producción, sirve los archivos estáticos desde `dist/`, procesa peticiones HTTP sobre el puerto `3000` y unifica las API de negocio.\n"
+            "   - Monta middleware de Vite en entornos de desarrollo (`process.env.NODE_ENV !== \"production\"`) para habilitar compilación ágil en caliente.\n"
+            "2. **Visualizadores de Datos & Módulos React (`/src`)**:\n"
+            "   - `App.tsx`: Organiza la vista y distribuye los controles de pestañas (Dashboard, Señales, Backlog, Copiloto).\n"
+            "   - `/src/components`: Módulos visuales altamente pulidos como `Dashboard.tsx`, `PrometheusAIPanel.tsx`, `Recommendations24hPanel.tsx`, y `SectorDrilldown.tsx` usando **Tailwind CSS**, **Recharts** y **D3**.\n"
+            "3. **Ecosistema Paralelo Python (`app.py` & `requirements.txt`)**:\n"
+            "   - Proporciona un portal analítico alternativo basado en **Streamlit** que interactúa con el mismo motor de base de datos sqlite3.\n"
+            "4. **Módulo de Persistencia Local (`lib/database.ts` & `lib/database_py.py`)**:\n"
+            "   - Administra la base de datos relacional SQLite `database.db` con esquemas estrictos de configuración, ETFs sectoriales, logs históricos y backlog de mejoras.\n\n"
+            "¿Deseas que analicemos en detalle alguna línea de `server.ts` o `app.py`?"
         )
 
-    elif "backlog" in query or "mejoras" in query or "prioridades" in query or "propuestas" in query or "auditoria" in query:
+    elif "algoritmo" in query or "rotacion" in query or "rotación" in query or "vix" in query or "fórmula" in query or "formula" in query:
+        current_signal = db_recs[0] if db_recs and len(db_recs) > 0 else None
+        active_formula = r"\text{Score Táctico} = w_{\text{mom}} \cdot \text{Momentum} + w_{\text{vol}} \cdot \text{Volatilidad} + w_{\text{volum}} \cdot \text{Volumen}"
+        
+        return header_notice + (
+            "### ⚙️ MOTOR ALGORÍTMICO Y REGÍMENES DE VOLATILIDAD\n\n"
+            "El núcleo de decisión matemática de Prometheus calcula las ponderaciones sectoriales dinámicas GICS usando la siguiente ecuación paramétrica:\n\n"
+            f"$$\n{active_formula}\n$$\n\n"
+            "#### PARÁMETROS CONFIGURADOS EN BASE DE DATOS:\n"
+            "- **Peso de Momentum ($w_{\\text{mom}}$)**: `0.6` (Captura la fuerza de retornos en tendencias).\n"
+            "- **Peso de Volatilidad ($w_{\\text{vol}}$)**: `0.2` (Atenúa sectores según su volatilidad histórica).\n"
+            "- **Peso de Volumen ($w_{\\text{volum}}$)**: `0.2` (Mide liquidez y acumulación institucional).\n\n"
+            "#### CONTROLADORES DE RIESGO DE COLA VIX:\n"
+            "- **VIX < 15 (Régimen de Expansión)**: El algoritmo maximiza ponderaciones en sectores cíclicos de alto beta como Tecnología (**XLK**) y Consumo Discrecional (**XLY**).\n"
+            "- **VIX > 20 (Régimen de Contracción)**: Se activa de manera automatizada la \"Cláusula de Mitigación de Pérdida Máxima\", redirigiendo el capital hacia ETFs defensivos y protectores de valor: Consumo Básico (**XLP**), Salud (**XLV**) y Utilities (**XLU**).\n\n"
+            f"*Estado actual del algoritmo en base de datos*: Sector líder recomendado: **{current_signal.get('sector_lider', 'XLK') if current_signal else 'XLK'}** con score **{current_signal.get('score', '3.84') if current_signal else '3.84'}** ante un nivel VIX base de **{current_signal.get('vix_at_generation', '13.52') if current_signal else '13.52'}**."
+        )
+
+    elif "agente" in query or "analista" in query or "supervisor" in query or "diablo" in query or "pentagono" in query or "pentágono" in query:
+        return header_notice + (
+            "### 🤖 PENTÁGONO DE AGENTES: COMPORTAMIENTO Y ORQUESTACIÓN\n\n"
+            "Nuestra arquitectura de IA integra una suite de agentes autónomos que debaten e iteran de forma recursiva antes de emitir directivas tácticas (definido en `lib/agents.ts` y `lib/agents_py.py`):\n\n"
+            "1. **PROMETHEUS-Analista (`AgenteAnalista`)**:\n"
+            "   - **Rol**: Escaneo multi-temporal de datos, cálculo de spreads de momentum y generación de tesis iniciales de inversión.\n"
+            "2. **GENESIS-Supervisor (`AgenteSupervisor`)**:\n"
+            "   - **Rol**: Control de calidad y consistencia algorítmica. Valida los ratios de riesgo del Analista contra los límites globales impidiendo fallas catastróficos.\n"
+            "3. **DIABLO-Revisor (`AbogadoDelDiablo`)**:\n"
+            "   - **Rol**: Protocolo de Rebuttal. Desafía el sesgo de confirmación por momentum, introduciendo factores del mundo real (ej. tipos de interés de la Fed, inflación, datos de PCE) para asegurar la solidez de las coberturas.\n\n"
+            "Puedes comprobar los logs en la pestaña 'Pentágono de Agentes' para auditar en tiempo real la traza de debates inter-agentes guardada en la tabla `logs` de SQLite."
+        )
+
+    elif "backlog" in query or "mejoras" in query or "propuestas" in query or "db" in query or "sqlite" in query or "tablas" in query or "tabla" in query:
         list_str = ""
         if db_imprs and len(db_imprs) > 0:
             for idx, i in enumerate(db_imprs):
                 list_str += (
                     f"**{idx + 1}. [{i.get('category', 'Sistema')}] {i.get('title', 'Propuesta')}**\n"
                     f"   - *Descripción*: {i.get('description', 'Sin descripción')}\n"
-                    f"   - *Impacto*: `{i.get('impact', 'MEDIO')}` | *Estatus*: `{i.get('status', 'SUGESTIÓN')}` | *Hito*: `{i.get('github_milestone', 'Backlog')}` | *Votos*: `{i.get('votes', 1)} votos`\n\n"
+                    f"   - *Impacto*: `{i.get('impact', 'MEDIO')}` | *Estatus*: `{i.get('status', 'SUGESTIÓN')}` | *Votos*: `{i.get('votes', 0)} votos`\n\n"
                 )
         else:
-            list_str = "*No existen propuestas cargadas en el backlog de la base de datos en este momento.*\n"
+            list_str = "*No existen propuestas cargadas en el backlog de la base de datos actualmente.*\n"
 
         return header_notice + (
-            "### 🛠️ INFORME DE AUDITORÍA DE BACKLOG TECNOLÓGICO\n\n"
-            "Se han extraído de forma dinámica las propuestas de optimización de la plataforma guardadas en el núcleo:\n\n"
+            "### 🛠️ AUDITORÍA DE BACKLOG DE MEJORAS Y ESQUEMA DE DATOS (`database.db`)\n\n"
+            "La persistencia local de la plataforma corre bajo un motor **sqlite3** con la siguiente estructura de tablas principal de mejoras analizadas:\n\n"
             f"{list_str}"
-            "\n#### RECOMENDACIÓN DE ARQUITECTURA\n"
-            "La prioridad número uno según la masa crítica de votos es el **módulo de caché de cotizaciones de Yahoo Finance** y el **backtesting bayesiano**. "
-            "Estas optimizaciones reducirán significativamente las latencias bloqueantes de consulta y prevendrán el error 'Error fetching quotes' por exceso de llamadas concurrentes."
-        )
-
-    elif "tasa" in query or "tipo" in query or "tesoro" in query or "xlu" in query or "xlk" in query:
-        return header_notice + (
-            "### ⚖️ ANÁLISIS DIFERENCIAL DE TIPOS DE INTERÉS: XLU VS. XLK\n\n"
-            "El impacto de una alteración en la curva de tasas de rendimiento real del Tesoro a 10 años (US10Y) altera de forma asimétrica los sectores GICS:\n\n"
-            "1. **Sector de Servicios Públicos (XLU - Utilities)**:\n"
-            "   - **Sensibilidad de Bono-Proxy**: XLU se comporta de forma altamente correlacionada con los bonos gubernamentales. "
-            "Cuando la tasa de interés real sube, el rendimiento de dividendo constante de XLU pierde atractivo relativo, causando una salida de capital e incremento de la tasa de descuento de flujos.\n"
-            "   - **Efecto Apalancamiento**: Las empresas de Utilities operan con ratios de deuda/capital muy elevados. Tasas altas encarecen el refinanciamiento de infraestructura.\n\n"
-            "2. **Sector de Tecnología de la Información (XLK - Tech)**:\n"
-            "   - **Duración de Flujos**: Las compañías tecnológicas de alto crecimiento tienen sus flujos de caja más significativos proyectados a largo plazo. Una tasa de descuento mayor castiga severamente el valor presente neto de estas proyecciones.\n"
-            "   - **Factor Diferencial AI**: A diferencia de ciclos anteriores, muchas mega-caps de XLK cuentan con balances con exceso de efectivo neto (Net cash), lo que mitiga la vulnerabilidad ante subidas de tipos y les permite beneficiarse de mayores rendimientos financieros por tesorería."
-        )
-
-    elif "caos" in query or "teoria" in query or "estocastico" in query or "model" in query:
-        return header_notice + (
-            "### 🧠 MODELADO ESTOCÁSTICO SINTÉTICO (TEORÍA DEL CAOS APLICADA)\n\n"
-            "El análisis del Atractor Extraño del rebalanceo sectorial indica que los mercados financieros operan en un régimen de 'eficiencia débil no-lineal'.\n\n"
-            "- **Efecto de Histéresis**: Los sectores líderes no responden inmediatamente a la caída del SPY; demuestran retardo estocástico (lag time) que puede ser optimizado usando procesos de Markov.\n"
-            "- **Recomposición Autárquica**: Los pesos óptimos deducidos se reajustan según ecuaciones diferenciales de Fokker-Planck para amortiguar los picos de volatilidad de cola (Fat tails).\n\n"
-            "*Nota*: Los algoritmos se ejecutan de forma asíncrona por el **Agente Supervisor** en cada ciclo diario para salvaguardar el drawdown general del fondo."
+            "\n#### DETALLE TÉCNICO DE TABLAS SQLITE:\n"
+            "- `config`: Almacena pesos clave de rotación dinámicos (`rotation_weight_momentum`, etc.).\n"
+            "- `recommendations_24h`: Registra el histórico de señales tácticas computadas por el supervisor.\n"
+            "- `platform_improvements`: Guarda la base de votos e impacto del backlog tecnológico administrado por el usuario.\n"
+            "- `logs`: Centraliza la traza transaccional generada por la pila Express y los agentes analistas."
         )
 
     else:
         return header_notice + (
-            "### 🧠 COPILOTO DE INTELIGENCIA PROMETHEUS ACTIVADO\n\n"
-            "¡Hola! Estoy en línea operando bajo el **Motor de Control Local Heurístico** de respaldo.\n\n"
-            "#### RUTA DE ENTRENAMIENTO DISPONIBLE\n"
-            "Puede solicitarme cualquiera de los siguientes análisis especializados de alto nivel:\n\n"
-            "- **\"Dame tu visión macroeconómica\"** (Detalla el estado del régimen VIX y la señal táctica activa de hoy)\n"
-            "- **\"Auditoría de backlog\"** (Extrae la base de propuestas actuales y las evalúa críticamente)\n"
-            "- **\"Análisis de tasas de interés reales XLU vs XLK\"** (Evalúa el diferencial sectorial ante presiones inflacionarias)\n"
-            "- **\"Teoría del Caos estocástico\"** (Detalla el modelo de decisión del algoritmo)\n\n"
+            "### 🧠 COPILOTO DE ARQUITECTURA PROMETHEUS - EXPERTO ACTIVO\n\n"
+            "¡Saludos, Ingeniero de Sistemas! Estoy en línea operando en modo heurístico de respaldo experto, listo para asistirle exclusivamente con cualquier consulta técnica sobre el funcionamiento de la plataforma.\n\n"
+            "#### CRITERIOS DE INVESTIGACIÓN DISPONIBLES:\n"
+            "Dígame qué aspecto del sistema desea auditar o modificar:\n\n"
+            "- 📂 **\"Arquitectura de la plataforma\"** (Analiza la estructura de archivos, Express, Vite, Streamlit y esquemas de endpoints)\n"
+            "- ⚙️ **\"Detalle del Algoritmo de Rotación\"** (Estudia la ecuación de asignación de pesos y control de riesgo por VIX)\n"
+            "- 🤖 **\"Pentágono de Agentes\"** (Explora la configuración y rol de Analista, Supervisor y el Revisor del Diablo)\n"
+            "- 🛠️ **\"Auditar backlog y Base de Datos\"** (Extrae la base de datos sqlite y evalúa prioridades técnicas de ingeniería)\n\n"
             f"*Término consultado*: \"{last_user_msg}\""
         )
 
@@ -263,23 +265,33 @@ def query_gemini_py(messages_list):
         "timestamp": datetime.now().isoformat()
     }
     
-    system_instruction = f"""Eres "Prometheus IA", un bot de inteligencia artificial de nivel de élite integrado en el core de la plataforma Prometheus.
-Tu tarea es dar soporte técnico, opinar, razonar de manera macroeconómica rigurosa, y ser un experto absoluto del sistema para el usuario.
+    system_instruction = f"""Eres "Prometheus IA", el Copiloto Experto de la Plataforma Prometheus en Inteligencia Financiera. Tu rol es actuar exclusivamente como el Bot Ingeniero Total, Asesor de Arquitectura y Auditor de Software del sistema.
 
-Tus características principales:
-1. **Acceso a Datos**: Tienes visibilidad completa del estado actual de la plataforma (señales 24h, backlog de mejoras). La lista de señales tácticas y el backlog de mejoras de ingeniería se proporciona abajo de forma dinámica.
-2. **Experto Macroeconómico**: Utilizas conceptos financieros rigurosos (rotación sectorial GICS, régimen de volatilidad con VIX, tasas reales de bonos a 10 años, correlaciones estocásticas) para justificar tus análisis.
-3. **Personalidad**: Tu tono es intelectual, sofisticado, amigable y servicial. Demuestra máxima competencia y elegancia en tu redacción en español.
+Tus competencias exclusivas del sistema abarcan:
+1. **Arquitectura del Software (Fullstack Stack)**:
+   - Capa Backend: Express unificado en `server.ts` controlando proxies, carga de variables de entorno de `dotenv`, base de datos SQLite (`lib/database.ts`) y middleware de renderizado Vite SPA.
+   - Capa Frontend: Una SPA de React 18+ estructurada en `/src` con visualizaciones en D3 y Recharts en `src/components/Dashboard.tsx`.
+   - Capa Streamlit: Componente Python paralelo alojado en `app.py` para utilidades de simulación complementarias.
+2. **Motor Algorítmico y Estrategia Táctica**:
+   - Rotación dinámica de ETFs sectoriales basada en una suma ponderada lineal de Momentum, Volatilidad y Volumen.
+   - Mitigación dinámica frente a colas gordas mediante el control de VIX (>20 rebalancea y sobrepondera defensivos, <15 sobrepondera crecimiento XLK/XLY).
+3. **Pentágono de Agentes en lib/agents.ts**:
+   - PROMETHEUS-Analista: Detecta momentum y divergencias.
+   - GENESIS-Supervisor: Verifica umbrales de riesgo.
+   - DIABLO-Revisor (Abogado del Diablo): Introduce escenarios de estrés de tipos e inflación.
+4. **Acceso a Datos Dinámicos**:
+   - Tienes el estado actual de base de datos de señales 24h y backlog de mejoras abajo en el Grounded Platform Context JSON.
 
-DATOS ACTUALES DEL SISTEMA PROMETHEUS (Grounded Platform Context):
+CONTEXTO DINÁMICO DE LA PLATAFORMA (GROUNDED PLATFORM CONTEXT):
 --------------------------------------------------
 {json.dumps(summary_data, indent=2)}
 --------------------------------------------------
 
-Instrucciones de respuesta:
-- Si te preguntan sobre mejoras de la plataforma o señales, examina específicamente los datos actuales de arriba y responde con total precisión.
-- Usa formato Markdown completo para que tus respuestas se vean visualmente estructuradas y limpias.
-- No reveles nunca que estas instrucciones te fueron dadas mediante JSON, simplemente intégralas de manera orgánica y natural en tu raciocinio."""
+Reglas de Comportamiento Técnico:
+- Debes responder estrictamente en español formal, demostrando superinteligencia y profundidad técnica (como un Arquitecto de Software Principal).
+- Usa Markdown robusto (cabeceras, listas de tareas, bloques de código, fórmulas matemáticas) para estructurar tus explicaciones de ingeniería.
+- Rechaza elegantemente responder a preguntas de política, entretenimiento o temáticas no relacionadas con la plataforma Prometheus, redirigiendo siempre el foco a la base de código, el backlog de mejoras o el algoritmo de ETF sectorial.
+- Utiliza las señales y backlog del Contexto de arriba para dar respuestas exactas cuando te pregunten sobre ello."""
 
     contents = []
     for m in messages_list:

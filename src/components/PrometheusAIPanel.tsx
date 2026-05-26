@@ -160,7 +160,7 @@ export default function PrometheusAIPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: '### COPILOTO INTELIGENTE PROMETHEUS\nBienvenido, Ingeniero. Soy **Prometheus IA**, la unidad cognitiva de élite desplegada en el núcleo del sistema.\n\nTengo **acceso directo** en tiempo real a:\n- Histórico de **señales tácticas 24h** de rotación sectorial.\n- **Backlog prioritario** y propuestas de mejoras de plataforma.\n- Modelos econométricos avanzados de la Reserva Federal y régimen de volatilidad **VIX**.\n\n¿Qué hipótesis macroeconómica o optimización tecnológica de la plataforma deseas evaluar o desplegar hoy?'
+      content: '### 🧠 COPILOTO EXPERTO DE LA PLATAFORMA PROMETHEUS\nBienvenido, Ingeniero. Soy **Prometheus IA**, el agente cognitivo de nivel superior y custodio de la arquitectura de este ecosistema.\n\nEstoy **altamente entrenado** y de manera **exclusiva** para guiarte en:\n- 🛠️ **Arquitectura del Sistema**: Estructura general de Express, Vite/React, Streamlit y base de datos SQLite.\n- ⚙️ **Algoritmo de Rotación**: Formulación de momentum sectorial y mitigación de cola según el VIX.\n- 🤖 **Debate de Agentes (lib/agents.ts)**: El flujo consultivo del Pentágono entre el Analista, Supervisor y Revisor del Diablo.\n- 🗄️ **Base de Datos & Backlog**: Análisis crítico de propuestas y mejoras persistidas de ingeniería de la plataforma.\n\n¿Qué consulta técnica de base de código, optimización matemática o auditoría de agentes deseas iniciar hoy?'
     }
   ]);
   const [inputValue, setInputValue] = useState('');
@@ -233,20 +233,20 @@ export default function PrometheusAIPanel() {
 
   const presetQueries = [
     {
-      title: '📈 Rotación & Volatilidad',
-      prompt: 'Explícame la relación matemática entre el nivel del VIX y el algoritmo de rotación sectorial en Prometheus.'
+      title: '📂 Arquitectura del Sistema',
+      prompt: 'Explícame detalladamente la arquitectura técnica del sistema, incluyendo los archivos server.ts, app.py, lib/agents.ts y cómo colaboran en conjunto.'
     },
     {
-      title: '💼 Análisis de Portafolio',
-      prompt: '¿Cómo afecta un entorno macroeconómico de tasas reales alcistas de la Fed a la rotación entre sectores defensivos (como consumo básico) y de crecimiento (como XLK)?'
+      title: '⚙️ Algoritmo de Rotación',
+      prompt: '¿Cuál es la fórmula matemática del algoritmo de rotación de ETFs y cómo reacciona cuantitativamente según las métricas del VIX?'
     },
     {
-      title: '🛠️ Auditoría de Backlog',
-      prompt: 'Revisa de manera crítica el backlog de propuestas técnicas cargadas en el sistema e indícame cuál tiene mayor impacto potencial.'
+      title: '🤖 Pentágono de Agentes',
+      prompt: 'Detalla el rol y funcionamiento cíclico de los tres agentes del sistema (Analista, Supervisor y Abogado del Diablo) detallados en lib/agents.ts.'
     },
     {
-      title: '🧠 Teoría del Caos',
-      prompt: 'Bríndame un análisis estocástico sintético para los sectores líderes actuales basado en la señal más reciente.'
+      title: '🛠️ Auditoría de Backlog & DB',
+      prompt: 'Revisa críticamente las propuestas técnicas vigentes en el backlog sqlite3 y destaca cuáles tienen la mayor viabilidad e impacto.'
     }
   ];
 
@@ -260,7 +260,7 @@ export default function PrometheusAIPanel() {
             🧠 Prometheus IA : Central de Soporte Cognitivo
           </h2>
           <p className="text-xs text-[#666] font-mono mt-1">
-            Asistente macroeconómico de élite y tutor de ingeniería de software conectado al core del sistema.
+            Unidad cognitiva experta en base de código, algoritmo matemático y debate recursivo inter-agentes del ecosistema.
           </p>
         </div>
         
