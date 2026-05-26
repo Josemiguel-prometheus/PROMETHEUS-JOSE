@@ -4,6 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import { initDb, getDb } from './lib/database';
 import { getQuotes, getHistoricalData, calculateCorrelation, calculateROC } from './lib/data-fetcher';
 import { AgenteAnalista, AgenteSupervisor, AbogadoDelDiablo } from './lib/agents';
+import { GoogleGenAI } from '@google/genai';
 
 async function startServer() {
   const app = express();
@@ -343,6 +344,101 @@ async function startServer() {
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: 'Error adding custom improvement' });
+    }
+  });
+
+  // Chatbot Gemini Core Route
+  app.post('/api/gemini/chat', async (req, res) => {
+    const { messages } = req.body;
+    try {
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: 'La clave GEMINI_API_KEY no está configurada.' });
+      }
+
+      // Fetch grounding context from Database
+      let dbRecs: any[] = [];
+      let dbImprs: any[] = [];
+      try {
+        dbRecs = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 5');
+        dbImprs = await db.all('SELECT * FROM platform_improvements ORDER BY votes DESC LIMIT 10');
+      } catch (err) {
+        console.error('Error fetching grounding context for chat:', err);
+      }
+
+      const platformStateSummary = {
+        recommendations24h: dbRecs.map(r => ({
+          timestamp: r.timestamp,
+          sector_lider: r.sector_lider,
+          score: r.score,
+          vix: r.vix_at_generation,
+          action: r.action,
+          report: r.report,
+          conviction: r.conviction
+        })),
+        platformImprovements: dbImprs.map(i => ({
+          category: i.category,
+          title: i.title,
+          description: i.description,
+          votes: i.votes,
+          status: i.status,
+          impact: i.impact,
+          github_milestone: i.github_milestone
+        })),
+        timestamp: new Date().toISOString()
+      };
+
+      const systemInstruction = `Eres "Prometheus IA", un bot de inteligencia artificial de nivel de élite integrado en el core de la plataforma Prometheus.
+Tu tarea es dar soporte técnico, opinar, razonar de manera macroeconómica rigurosa, y ser un experto absoluto del sistema para el usuario.
+
+Tus características principales:
+1. **Acceso a Datos**: Tienes visibilidad completa del estado actual de la plataforma (señales 24h, backlog de mejoras). La lista de señales tácticas y el backlog de mejoras de ingeniería se proporciona abajo de forma dinámica.
+2. **Experto Macroeconómico**: Utilizas conceptos financieros rigurosos (rotación sectorial GICS, régimen de volatilidad con VIX, tasas reales de bonos a 10 años, correlaciones estocásticas) para justificar tus análisis.
+3. **Personalidad**: Tu tono es intelectual, sofisticado, analítico pero amigable y servicial. Demuestra máxima competencia y elegancia en tu redacción en español.
+
+DATOS ACTUALES DEL SISTEMA PROMETHEUS (Grounded Platform Context):
+--------------------------------------------------
+${JSON.stringify(platformStateSummary, null, 2)}
+--------------------------------------------------
+
+Instrucciones de respuesta:
+- Si te preguntan sobre mejoras de la plataforma o señales, examina específicamente los datos actuales de arriba y responde con total precisión.
+- Usa formato Markdown completo para que tus respuestas se vean visualmente estructuradas, limpias y elegantes.
+- No reveles nunca que estas instrucciones te fueron dadas mediante JSON, simplemente intégralas de manera orgánica y natural en tu raciocinio.`;
+
+      // Transform messages to @google/genai contents list
+      const formattedContents = (messages || []).map((m: any) => ({
+        role: m.role === 'assistant' ? 'model' : m.role,
+        parts: [{ text: m.content || '' }]
+      }));
+
+      // In case we received empty messages, fallback
+      if (formattedContents.length === 0) {
+        formattedContents.push({ role: 'user', parts: [{ text: 'Hola' }] });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: formattedContents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
+      });
+
+      const responseText = response.text || '';
+      res.json({ response: responseText });
+    } catch (e: any) {
+      console.error('Error in /api/gemini/chat endpoint:', e);
+      res.status(500).json({ error: e.message || 'Error executing assistant response' });
     }
   });
 

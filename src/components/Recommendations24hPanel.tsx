@@ -49,6 +49,65 @@ export default function Recommendations24hPanel() {
   const [improvements, setImprovements] = useState<PlatformImprovement[]>([]);
   const [isLoadingImpr, setIsLoadingImpr] = useState(false);
 
+  // Prometheus AI Chatbot States
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+    { 
+      role: 'assistant', 
+      content: '¡Hola! Soy **Prometheus IA**, tu asesor macroeconómico y experto en la plataforma. Estoy conectado en tiempo real al backlog de mejoras, histórico de señales 24h y GICS rotations. ¿Qué escenario macroeconómico o propuesta técnica deseas validar?' 
+    }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatSending, setIsChatSending] = useState(false);
+
+  // Chat message send handler
+  const handleSendChatMessage = async (presetText?: string) => {
+    const textToSend = presetText || chatInput;
+    if (!textToSend.trim() || isChatSending) return;
+
+    const newUserMessage = { role: 'user' as const, content: textToSend };
+    const updatedMessages = [...chatMessages, newUserMessage];
+    setChatMessages(updatedMessages);
+    setChatInput('');
+    setIsChatSending(true);
+
+    try {
+      const res = await fetch('/api/gemini/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: updatedMessages })
+      });
+      const data = await res.json();
+      if (data.response) {
+        setChatMessages([...updatedMessages, { role: 'assistant' as const, content: data.response }]);
+      } else {
+        setChatMessages([...updatedMessages, { role: 'assistant' as const, content: `Error: ${data.error || 'Respuesta vacía del modelo.'}` }]);
+      }
+    } catch (err: any) {
+      console.error('Error sending chat message to Gemini:', err);
+      setChatMessages([...updatedMessages, { role: 'assistant' as const, content: `Error de red: ${err.message || err}` }]);
+    } finally {
+      setIsChatSending(false);
+    }
+  };
+
+  // Safe inline text formatter for bold **text** and linebreaks
+  const renderMessageContent = (content: string) => {
+    return content.split('\n').map((line, i) => {
+      const parts = line.split(/\*\*(.*?)\*\*/g);
+      const elements = parts.map((part, idx) => {
+        if (idx % 2 === 1) {
+          return <strong key={idx} className="text-orange-400 font-semibold">{part}</strong>;
+        }
+        return part;
+      });
+      return (
+        <p key={i} className="mb-1 leading-relaxed last:mb-0 text-left">
+          {elements}
+        </p>
+      );
+    });
+  };
+
   // Suggested item form
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -456,9 +515,92 @@ export default function Recommendations24hPanel() {
           </div>
         </div>
 
-        {/* Right Side: Previous Signal History logs */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-[#0F0F0f] border border-[#1A1A1A] p-5 rounded-sm h-full flex flex-col justify-between">
+        {/* Right Side: Previous Signal History logs & AI Copilot */}
+        <div className="lg:col-span-4 space-y-6 flex flex-col">
+          {/* Prometheus AI Chatbot Card */}
+          <div className="bg-[#0F0F0f] border border-orange-500/10 p-5 rounded-sm flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-orange-400 animate-pulse" />
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0] font-mono">Prometheus IA</h3>
+                  <p className="text-[9px] text-[#666]">Soporte Técnico & Macro 24H</p>
+                </div>
+              </div>
+              <span className="text-[8px] font-mono bg-orange-500/5 border border-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest">
+                ACTIVO
+              </span>
+            </div>
+
+            {/* Messages Area */}
+            <div className="h-[250px] overflow-y-auto space-y-3 pr-1 text-xs custom-scrollbar">
+              {chatMessages.map((msg, index) => (
+                <div 
+                  key={index} 
+                  className={cn(
+                    "p-3 rounded-sm leading-relaxed max-w-[95%]",
+                    msg.role === 'user' 
+                      ? "bg-orange-500/5 border border-orange-500/15 text-[#E4E3E0] ml-auto" 
+                      : "bg-[#141414] border border-[#222] text-gray-300 mr-auto"
+                  )}
+                >
+                  {renderMessageContent(msg.content)}
+                </div>
+              ))}
+              {isChatSending && (
+                <div className="bg-[#141414] border border-[#222] p-3 rounded-sm text-xs text-gray-400 mr-auto max-w-[95%] flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-orange-400" />
+                  <span>Razonando escenario macroeconómico...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Prompts Chips */}
+            <div className="flex flex-wrap gap-1.5 pt-3 border-t border-[#1A1A1A] mt-3">
+              <button 
+                onClick={() => handleSendChatMessage("Dame tu visión macroeconómica y el análisis de volatilidad actual.")}
+                disabled={isChatSending}
+                className="text-[9.5px] font-mono bg-[#141414] hover:bg-[#1C1C1C] text-[#AAA] hover:text-orange-300 border border-[#222] hover:border-orange-500/20 px-2.5 py-1 rounded-sm transition-all"
+              >
+                📊 Visión Macro
+              </button>
+              <button 
+                onClick={() => handleSendChatMessage("¿Qué mejoras tecnológicas y prioridades de desarrollo hay en el backlog?")}
+                disabled={isChatSending}
+                className="text-[9.5px] font-mono bg-[#141414] hover:bg-[#1C1C1C] text-[#AAA] hover:text-purple-300 border border-[#222] hover:border-purple-500/20 px-2.5 py-1 rounded-sm transition-all"
+              >
+                🛠️ Backlog Mejoras
+              </button>
+            </div>
+
+            {/* Chat Input */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendChatMessage();
+              }}
+              className="flex gap-2 mt-3"
+            >
+              <input
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="Pregunta o pide opinión macro..."
+                disabled={isChatSending}
+                className="flex-1 bg-[#141414] border border-[#222] focus:border-orange-500/30 text-xs px-3 py-2 rounded-sm text-white placeholder-gray-600 focus:outline-none transition-all"
+              />
+              <button
+                type="submit"
+                disabled={isChatSending || !chatInput.trim()}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-950 disabled:text-orange-900 text-black font-bold text-xs px-3 py-2 rounded-sm font-mono tracking-wider transition-all"
+              >
+                ENVIAR
+              </button>
+            </form>
+          </div>
+
+          {/* Historical Logs widget */}
+          <div className="bg-[#0F0F0f] border border-[#1A1A1A] p-5 rounded-sm flex-1 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3 mb-4">
                 <div className="flex items-center gap-2">
@@ -468,7 +610,7 @@ export default function Recommendations24hPanel() {
                 <span className="text-[9px] text-[#666] font-mono font-bold">10 ÚLTIMAS SEÑALES</span>
               </div>
 
-              <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1 select-none custom-scrollbar">
+              <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1 select-none custom-scrollbar">
                 {recList.map((item, idx) => (
                   <div 
                     key={idx} 
@@ -483,7 +625,7 @@ export default function Recommendations24hPanel() {
                       </div>
                       <span className={cn(
                         "text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-sm",
-                        item.conviction === 'ALTA' ? "bg-green-500/5 text-green-500 border border-green-500/10" : "bg-yellow-500/5 text-yellow-500 border border border-yellow-500/10"
+                        item.conviction === 'ALTA' ? "bg-green-500/5 text-green-500 border border-green-500/10" : "bg-yellow-500/5 text-yellow-500 border border-yellow-500/10"
                       )}>
                         {item.conviction}
                       </span>

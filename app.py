@@ -225,13 +225,90 @@ elif menu == "💡 Señales 24H & Mejoras":
     st.markdown('<div class="bloomberg-header font-sans" style="font-size: 24px; font-weight: 700; color: #f97316;">💡 SEÑALES 24H & MEJORAS DE PLATAFORMA</div>', unsafe_allow_html=True)
     st.caption("Consulte las recomendaciones sectoriales automáticas de Prometheus y envíe propuestas tecnológicas directamente a hito de GitHub.")
     
+    # Python Gemini Helper function definition (fully self-contained, no external deps)
+    def query_gemini_py(messages_list):
+        import os
+        import urllib.request
+        import json
+        
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            return "Error: La clave GEMINI_API_KEY no está configurada en la plataforma de forma local."
+            
+        try:
+            db_recs = db_lib.get_recommendations_24h(limit=5)
+            db_imprs = db_lib.get_platform_improvements()[:10]
+        except Exception:
+            db_recs = []
+            db_imprs = []
+            
+        summary_data = {
+            "recommendations24h": db_recs,
+            "platformImprovements": db_imprs,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        system_instruction = f"""Eres "Prometheus IA", un bot de inteligencia artificial de nivel de élite integrado en el core de la plataforma Prometheus.
+Tu tarea es dar soporte técnico, opinar, razonar de manera macroeconómica rigurosa, y ser un experto absoluto del sistema para el usuario.
+
+Tus características principales:
+1. **Acceso a Datos**: Tienes visibilidad completa del estado actual de la plataforma (señales 24h, backlog de mejoras). La lista de señales tácticas y el backlog de mejoras de ingeniería se proporciona abajo de forma dinámica.
+2. **Experto Macroeconómico**: Utilizas conceptos financieros rigurosos (rotación sectorial GICS, régimen de volatilidad con VIX, tasas reales de bonos a 10 años, correlaciones estocásticas) para justificar tus análisis.
+3. **Personalidad**: Tu tono es intelectual, sofisticado, amigable y servicial. Demuestra máxima competencia y elegancia en tu redacción en español.
+
+DATOS ACTUALES DEL SISTEMA PROMETHEUS (Grounded Platform Context):
+--------------------------------------------------
+{json.dumps(summary_data, indent=2)}
+--------------------------------------------------
+
+Instrucciones de respuesta:
+- Si te preguntan sobre mejoras de la plataforma o señales, examina específicamente los datos actuales de arriba y responde con total precisión.
+- Usa formato Markdown completo para que tus respuestas se vean visualmente estructuradas y limpias.
+- No reveles nunca que estas instrucciones te fueron dadas mediante JSON, simplemente intégralas de manera orgánica y natural en tu raciocinio."""
+
+        contents = []
+        for m in messages_list:
+            contents.append({
+                "role": "model" if m["role"] == "assistant" or m["role"] == "model" else "user",
+                "parts": [{"text": m["content"]}]
+            })
+            
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": contents,
+            "systemInstruction": {
+                "parts": [{"text": system_instruction}]
+            },
+            "generationConfig": {
+                "temperature": 0.7
+            }
+        }
+        
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=12) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                return res_data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            return f"Error llamando al API de Gemini: {str(e)}"
+
+    # Ensure python session state is tracking chatbot history
+    if "chat_history_py" not in st.session_state:
+        st.session_state.chat_history_py = [
+            {"role": "assistant", "content": "¡Hola! Soy **Prometheus IA**, tu asesor macroeconómico y experto en la plataforma. Estoy conectado en tiempo real al backlog de mejoras y señales 24h. ¿Qué escenario macro o propuesta tecnológica deseas evaluar hoy?"}
+        ]
+    
     # 24H recommendations
     recs = db_lib.get_recommendations_24h(limit=10)
     current_rec = recs[0] if recs else None
     
-    st.markdown("### 💡 Señal Activa 24H en Core")
+    st.markdown("### 💡 Señal Activa 24H, Análisis & Prometheus IA")
     
-    col1, col2 = st.columns([1, 2])
+    col1, col2, col3 = st.columns([1.2, 1.8, 2.0])
     
     with col1:
         st.markdown('<div class="metric-card" style="border-left: 4px solid #f97316; background-color: #0f0f15; padding: 20px; border-radius: 4px;">', unsafe_allow_html=True)
@@ -283,6 +360,52 @@ elif menu == "💡 Señales 24H & Mejoras":
             st.write(f"*{current_rec['report']}*")
         else:
             st.write("Ningún reporte detallado disponible.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown('<div class="metric-card" style="border-left: 4px solid #f43f5e; background-color: #0b0b0d; padding: 15px; border-radius: 4px; border: 1px solid #222;">', unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 5px 0; color: #f43f5e; font-size:14px; font-weight:700;'>🧠 Copiloto IA Prometheus GPT</h4>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size:10px; color:#666; margin-top:0;'>Soporte Técnico & Macro 24H</p>", unsafe_allow_html=True)
+        
+        # Messages
+        chat_html = ""
+        for m in st.session_state.chat_history_py:
+            is_user = m["role"] == "user"
+            align = "right" if is_user else "left"
+            bg = "rgba(244,63,94,0.06)" if is_user else "#141416"
+            border = "rgba(244,63,94,0.15)" if is_user else "#222"
+            chat_html += f"""
+            <div style="background-color: {bg}; border: 1px solid {border}; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; text-align: {align}; max-width: 95%; margin-{'left' if is_user else 'right'}: auto;">
+                <p style="font-size: 11px; color: #dfdfe4; margin:0; line-height:1.4;">{m['content']}</p>
+            </div>
+            """
+        st.markdown(f'<div style="height: 180px; overflow-y: auto; padding-right: 5px; margin-bottom: 12px;" class="custom-scrollbar">{chat_html}</div>', unsafe_allow_html=True)
+        
+        preset_cols = st.columns(2)
+        with preset_cols[0]:
+            if st.button("📊 Visión Macro", key="preset_macro_py", use_container_width=True):
+                st.session_state.chat_history_py.append({"role": "user", "content": "Dame tu visión macroeconómica y el análisis de volatilidad actual."})
+                with st.spinner("Razonando escenario macroeconómico..."):
+                    ans = query_gemini_py(st.session_state.chat_history_py)
+                    st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
+                st.rerun()
+        with preset_cols[1]:
+            if st.button("🛠️ Ver Backlog", key="preset_backlog_py", use_container_width=True):
+                st.session_state.chat_history_py.append({"role": "user", "content": "¿Qué mejoras tecnológicas y prioridades de desarrollo hay en el backlog?"})
+                with st.spinner("Leyendo backlog prioritario..."):
+                    ans = query_gemini_py(st.session_state.chat_history_py)
+                    st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
+                st.rerun()
+                
+        with st.form("py_chat_form", clear_on_submit=True):
+            user_input = st.text_input("Haz tu pregunta:", placeholder="Ej. ¿Qué opinas de ponderar tecnología?", key="user_msg_py")
+            send_cf = st.form_submit_button("EVALUAR ESCENARIO")
+            if send_cf and user_input.strip():
+                st.session_state.chat_history_py.append({"role": "user", "content": user_input})
+                with st.spinner("Razonando..."):
+                    ans = query_gemini_py(st.session_state.chat_history_py)
+                    st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
+                st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
         
     st.divider()
