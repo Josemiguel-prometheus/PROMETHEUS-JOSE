@@ -110,7 +110,7 @@ if 'safe_mode' not in st.session_state: st.session_state.safe_mode = False
 
 if "chat_history_py" not in st.session_state:
     st.session_state.chat_history_py = [
-        {"role": "assistant", "content": "¡Hola! Soy **Prometheus IA**, tu asesor macroeconómico y experto en la plataforma. Estoy conectado en tiempo real al backlog de mejoras y señales 24h. ¿Qué escenario macro o propuesta tecnológica deseas evaluar hoy?"}
+        {"role": "assistant", "content": "### 🧠 COPILOTO EXPERTO DE LA PLATAFORMA PROMETHEUS\nBienvenido, Ingeniero. Soy **Prometheus IA**, el agente cognitivo de nivel superior y custodio de la arquitectura de este ecosistema.\n\nEstoy **altamente entrenado** y de manera **exclusiva** para guiarte en:\n- 🛠️ **Arquitectura del Sistema**: Estructura general de Express, Vite/React, Streamlit y base de datos SQLite.\n- ⚙️ **Algoritmo de Rotación**: Formulación de momentum sectorial y mitigación de cola según el VIX.\n- 🤖 **Debate de Agentes (lib/agents.ts)**: El flujo consultivo del Pentágono entre el Analista, Supervisor y Revisor del Diablo.\n- 🗄️ **Base de Datos & Backlog**: Análisis crítico de propuestas y mejoras de ingeniería.\n\n¿Qué consulta técnica deseas iniciar hoy?"}
     ]
 
 def generate_heuristic_response_py(last_user_msg, db_recs, db_imprs):
@@ -578,7 +578,7 @@ elif menu == "🧠 Copiloto IA Prometheus":
         st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
         if st.button("🧹 LIMPIAR CHAT", use_container_width=True):
             st.session_state.chat_history_py = [
-                {"role": "assistant", "content": "¡Hola! Soy **Prometheus IA**, tu asesor macroeconómico y experto en la plataforma. Estoy conectado en tiempo real al backlog de mejoras y señales 24h. ¿Qué escenario macro o propuesta tecnológica deseas evaluar hoy?"}
+                {"role": "assistant", "content": "### 🧠 COPILOTO EXPERTO DE LA PLATAFORMA PROMETHEUS\nBienvenido, Ingeniero. Soy **Prometheus IA**, el agente cognitivo de nivel superior y custodio de la arquitectura de este ecosistema.\n\nEstoy **altamente entrenado** y de manera **exclusiva** para guiarte en:\n- 🛠️ **Arquitectura del Sistema**: Estructura general de Express, Vite/React, Streamlit y base de datos SQLite.\n- ⚙️ **Algoritmo de Rotación**: Formulación de momentum sectorial y mitigación de cola según el VIX.\n- 🤖 **Debate de Agentes (lib/agents.ts)**: El flujo consultivo del Pentágono entre el Analista, Supervisor y Revisor del Diablo.\n- 🗄️ **Base de Datos & Backlog**: Análisis crítico de propuestas y mejoras de ingeniería.\n\n¿Qué consulta técnica deseas iniciar hoy?"}
             ]
             st.success("Historial de chat restablecido.")
             st.rerun()
@@ -591,26 +591,33 @@ elif menu == "🧠 Copiloto IA Prometheus":
             st.markdown(m["content"])
 
     # Quick prompt triggers (preset queries)
-    st.markdown('<div style="margin-top:20px; font-size:10px; color:#666; font-family:\'JetBrains Mono\'; text-transform:uppercase">Sugerencias de Consulta:</div>', unsafe_allow_html=True)
-    col_p1, col_p2, col_p3 = st.columns(3)
+    st.markdown('<div style="margin-top:20px; font-size:10px; color:#f97316; font-family:\'JetBrains Mono\'; font-weight:bold; text-transform:uppercase">Sugerencias de Consulta Rápida:</div>', unsafe_allow_html=True)
+    col_p1, col_p2, col_p3, col_p4 = st.columns(4)
     with col_p1:
-        if st.button("📊 Reporte Macroeconómico", use_container_width=True, help="Solicitar análisis de régimen de volatilidad, tasas y sectores."):
-            st.session_state.chat_history_py.append({"role": "user", "content": "Dame tu visión macroeconómica integral, basándote en el régimen de volatilidad actual y las fuerzas de sector."})
-            with st.spinner("Razonando escenario macroeconómico..."):
+        if st.button("📂 Arquitectura", use_container_width=True, help="Auditar estructura general de la base de código y Express/Vite."):
+            st.session_state.chat_history_py.append({"role": "user", "content": "Explícame detalladamente la arquitectura técnica del sistema, incluyendo los archivos server.ts, app.py, lib/agents.ts y cómo colaboran en conjunto."})
+            with st.spinner("Compilando mapa de arquitectura..."):
                 ans = query_gemini_py(st.session_state.chat_history_py)
                 st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
             st.rerun()
     with col_p2:
-        if st.button("🛠️ Auditoría de Backlog", use_container_width=True, help="Auditar backlog tecnológico actual."):
-            st.session_state.chat_history_py.append({"role": "user", "content": "¿Cuáles son las prioridades tecnológicas de desarrollo en nuestro backlog actuales y qué impacto tienen?"})
-            with st.spinner("Razonando prioridades tecnológicas..."):
+        if st.button("⚙️ Algoritmo GICS", use_container_width=True, help="Revisar ecuación del algoritmo de rotación y mitigación de volatilidad."):
+            st.session_state.chat_history_py.append({"role": "user", "content": "¿Cuál es la fórmula matemática del algoritmo de rotación de ETFs y cómo reacciona cuantitativamente según las métricas del VIX?"})
+            with st.spinner("Analizando ecuaciones algorítmicas..."):
                 ans = query_gemini_py(st.session_state.chat_history_py)
                 st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
             st.rerun()
     with col_p3:
-        if st.button("📈 Escenario de Subidas de Tipos", use_container_width=True, help="Analizar impacto de tasas en sectores GICS."):
-            st.session_state.chat_history_py.append({"role": "user", "content": "¿Cómo impactaría una subida de tasas de interés reales del tesoro en la rotación sectorial de XLU (Utilities) y XLK (Tecnología)?"})
-            with st.spinner("Modelando impacto de tasas de interés..."):
+        if st.button("🤖 Agentes", use_container_width=True, help="Ver debate y orquestación del Pentágono de Agentes de lib/agents.ts."):
+            st.session_state.chat_history_py.append({"role": "user", "content": "Detalla el rol y funcionamiento cíclico de los tres agentes del sistema (Analista, Supervisor y Abogado del Diablo) detallados en lib/agents.ts."})
+            with st.spinner("Sincronizando flujo de debate..."):
+                ans = query_gemini_py(st.session_state.chat_history_py)
+                st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
+            st.rerun()
+    with col_p4:
+        if st.button("🛠️ Backlog & DB", use_container_width=True, help="Consultar propuestas de base de datos sqlite3 persistentemente."):
+            st.session_state.chat_history_py.append({"role": "user", "content": "Revisa críticamente las propuestas técnicas vigentes en el backlog sqlite3 y destaca cuáles tienen la mayor viabilidad e impacto."})
+            with st.spinner("Consultando base de datos SQLite..."):
                 ans = query_gemini_py(st.session_state.chat_history_py)
                 st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
             st.rerun()
