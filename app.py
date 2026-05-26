@@ -120,8 +120,43 @@ def query_gemini_py(messages_list):
     from datetime import datetime
     
     api_key = os.environ.get("GEMINI_API_KEY")
+    
+    # Fallback 1: Case-insensitive scan of environment keys matching typical API Key labels
     if not api_key:
-        return "Error: La clave GEMINI_API_KEY no está configurada en la plataforma de forma local."
+        for key, val in os.environ.items():
+            if key.upper() in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_KEY", "API_KEY", "VITE_GEMINI_API_KEY"]:
+                api_key = val
+                break
+                
+    # Fallback 2: Manual .env inspection in current working dir and its ancestry
+    if not api_key:
+        try:
+            curr_dir = os.path.abspath(os.getcwd())
+            for _ in range(4):
+                env_path = os.path.join(curr_dir, ".env")
+                if os.path.isfile(env_path):
+                    with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith("#") and "=" in line:
+                                parts = line.split("=", 1)
+                                k = parts[0].strip().strip('"').strip("'")
+                                if k.upper() in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_KEY", "API_KEY", "VITE_GEMINI_API_KEY"]:
+                                    api_key = parts[1].strip().strip('"').strip("'")
+                                    break
+                if api_key:
+                    break
+                parent = os.path.dirname(curr_dir)
+                if parent == curr_dir:
+                    break
+                curr_dir = parent
+        except Exception:
+            pass
+            
+    if not api_key:
+        env_keys_summary = ", ".join([k for k in os.environ.keys() if "KEY" in k.upper() or "API" in k.upper() or "GEMINI" in k.upper()])
+        return f"Error: La clave GEMINI_API_KEY no está configurada en la plataforma ni en los archivos locales. (Buscado en .env y variables. Claves de entorno detectadas: {env_keys_summary or 'Ninguna'}). Por favor configúrelo en la pestaña Settings de AI Studio."
+
         
     try:
         db_recs = db_lib.get_recommendations_24h(limit=5)

@@ -5,6 +5,9 @@ import { initDb, getDb } from './lib/database';
 import { getQuotes, getHistoricalData, calculateCorrelation, calculateROC } from './lib/data-fetcher';
 import { AgenteAnalista, AgenteSupervisor, AbogadoDelDiablo } from './lib/agents';
 import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 async function startServer() {
   const app = express();
