@@ -62,7 +62,89 @@ export async function initDb() {
       impact TEXT,
       github_milestone TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS portfolio (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      assets TEXT,
+      total_value REAL,
+      cash REAL,
+      benchmark_spy_price REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS recommendations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      analyst_report TEXT,
+      devil_advocate_report TEXT,
+      final_recommendation TEXT,
+      user_decision TEXT,
+      user_reflection TEXT,
+      market_context TEXT,
+      global_conviction TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS learning_insights (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      type TEXT,
+      insight TEXT,
+      impact_level TEXT,
+      applied INTEGER
+    );
   `);
+
+  // Seed portfolio, recommendations, and learning_insights if empty
+  const portCountRow = await db.get('SELECT count(*) as count FROM portfolio');
+  const portCount = portCountRow ? (portCountRow as any).count : 0;
+  if (portCount === 0) {
+    await db.run(`
+      INSERT INTO portfolio (assets, total_value, cash, benchmark_spy_price) 
+      VALUES ('{"XLK": 35, "XLF": 25, "XLE": 20, "XLV": 20}', 100000.00, 5000.00, 445.50)
+    `);
+  }
+
+  const recsCountRow = await db.get('SELECT count(*) as count FROM recommendations');
+  const recsCount = recsCountRow ? (recsCountRow as any).count : 0;
+  if (recsCount === 0) {
+    await db.run(`
+      INSERT INTO recommendations (analyst_report, devil_advocate_report, final_recommendation, user_decision, user_reflection, market_context, global_conviction)
+      VALUES (
+        'Fuerza de momentum en XLK sugerido por flujos sectoriales.',
+        'Sugerencia de moderación por valoración de múltiplos extremos.',
+        'Rotación parcial moderada hacia XLK mitigando con defensivos.',
+        'ACEPTADA',
+        'Se decide aceptar siguiendo la disciplina algorítmica y reduciendo utilities.',
+        'VIX < 15, Mercado Alza',
+        'ALTA'
+      )
+    `);
+    await db.run(`
+      INSERT INTO recommendations (analyst_report, devil_advocate_report, final_recommendation, user_decision, user_reflection, market_context, global_conviction)
+      VALUES (
+        'Propuesta de sobreponderación de XLY basada en datos de retail transitorios.',
+        'Contratendencia de crédito de consumo debilitándose a mediano plazo.',
+        'Mantener liquidez defensiva reduciendo consumo discrecional.',
+        'RECHAZADA',
+        'Rechazada considerando el stress-test negativo del Abogado del Diablo ante cisne negro.',
+        'VIX 18.20, Mercado Mixto',
+        'MEDIA'
+      )
+    `);
+  }
+
+  const insightsCountRow = await db.get('SELECT count(*) as count FROM learning_insights');
+  const insightsCount = insightsCountRow ? (insightsCountRow as any).count : 0;
+  if (insightsCount === 0) {
+    await db.run(`
+      INSERT INTO learning_insights (type, insight, impact_level, applied)
+      VALUES ('Calibración de Filtro Beta', 'Reducción del peso de momentum sectorial si el VIX cruza exponencialmente por encima de 24.', 'ALTO', 1)
+    `);
+    await db.run(`
+      INSERT INTO learning_insights (type, insight, impact_level, applied)
+      VALUES ('Correlaciones Estructurales', 'Ajuste de sensibilidad en XLRE (Real Estate) por spreads de tasas reales del tesoro a 10 años.', 'MEDIO', 1)
+    `);
+  }
 
   // Seed default weights if not present
   await db.run("INSERT OR IGNORE INTO config (key, value) VALUES ('rotation_weight_momentum', '0.6')");

@@ -350,98 +350,78 @@ async function startServer() {
     }
   });
 
-  // Endpoints de Gestión de Datos y Memoria de Prometheus
+  // Endpoints de Gestión de Datos y Memoria de Prometheus (Sincronización de Portafolio y Laboratorio Vivo)
   app.get('/api/data-management/export', async (req, res) => {
     try {
-      const config = await db.all('SELECT * FROM config');
-      const etfs = await db.all('SELECT * FROM etfs');
-      const platform_improvements = await db.all('SELECT * FROM platform_improvements');
-      const recommendations_24h = await db.all('SELECT * FROM recommendations_24h');
-      const logs = await db.all('SELECT * FROM logs');
+      const portfolio = await db.all('SELECT * FROM portfolio');
+      const recommendations = await db.all('SELECT * FROM recommendations');
+      const learning_insights = await db.all('SELECT * FROM learning_insights');
 
       res.json({
-        system_identifier: "PROMETHEUS_MEMORY_BACKUP_V5",
+        system_identifier: "PROMETHEUS_TACTICAL_MEMORY_V5",
         exported_at: new Date().toISOString(),
-        config,
-        etfs,
-        platform_improvements,
-        recommendations_24h,
-        logs
+        portfolio,
+        recommendations,
+        learning_insights
       });
     } catch (error: any) {
       console.error('Export error:', error);
-      res.status(500).json({ error: 'Fallo al exportar los datos base de Prometheus: ' + error.message });
+      res.status(500).json({ error: 'Fallo al exportar los datos tácticos de Prometheus: ' + error.message });
     }
   });
 
   app.post('/api/data-management/import', async (req, res) => {
     const data = req.body;
-    if (!data || data.system_identifier !== "PROMETHEUS_MEMORY_BACKUP_V5") {
-      return res.status(400).json({ error: 'La copia de seguridad no es válida o no corresponde al formato de la plataforma Prometheus.' });
+    if (!data || data.system_identifier !== "PROMETHEUS_TACTICAL_MEMORY_V5") {
+      return res.status(400).json({ error: 'La copia de seguridad no es válida o no corresponde al formato táctico de la plataforma Prometheus.' });
     }
 
     try {
       await db.run('BEGIN TRANSACTION');
 
       // 1. Limpiar estructuras actuales de memoria
-      await db.run('DELETE FROM config');
-      await db.run('DELETE FROM etfs');
-      await db.run('DELETE FROM platform_improvements');
-      await db.run('DELETE FROM recommendations_24h');
-      await db.run('DELETE FROM logs');
+      await db.run('DELETE FROM portfolio');
+      await db.run('DELETE FROM recommendations');
+      await db.run('DELETE FROM learning_insights');
 
-      // 2. Configuración
-      if (Array.isArray(data.config)) {
-        for (const item of data.config) {
-          await db.run('INSERT INTO config (key, value) VALUES (?, ?)', item.key, item.value);
-        }
-      }
-
-      // 3. ETFs
-      if (Array.isArray(data.etfs)) {
-        for (const item of data.etfs) {
-          await db.run('INSERT INTO etfs (ticker, name, sector, added_at) VALUES (?, ?, ?, ?)', item.ticker, item.name, item.sector, item.added_at);
-        }
-      }
-
-      // 4. Mejoras del sistema / Backlog
-      if (Array.isArray(data.platform_improvements)) {
-        for (const item of data.platform_improvements) {
+      // 2. Mi Portafolio
+      if (Array.isArray(data.portfolio)) {
+        for (const item of data.portfolio) {
           await db.run(
-            'INSERT INTO platform_improvements (id, category, title, description, votes, status, impact, github_milestone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            item.id, item.category, item.title, item.description, item.votes, item.status, item.impact, item.github_milestone
+            'INSERT INTO portfolio (id, timestamp, assets, total_value, cash, benchmark_spy_price) VALUES (?, ?, ?, ?, ?, ?)',
+            item.id, item.timestamp, item.assets, item.total_value, item.cash, item.benchmark_spy_price
           );
         }
       }
 
-      // 5. Historial de señales de rotación
-      if (Array.isArray(data.recommendations_24h)) {
-        for (const item of data.recommendations_24h) {
+      // 3. Laboratorio Vivo - Decisiones
+      if (Array.isArray(data.recommendations)) {
+        for (const item of data.recommendations) {
           await db.run(
-            'INSERT INTO recommendations_24h (id, timestamp, sector_lider, score, vix_at_generation, action, report, conviction) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            item.id, item.timestamp, item.sector_lider, item.score, item.vix_at_generation, item.action, item.report, item.conviction
+            'INSERT INTO recommendations (id, timestamp, analyst_report, devil_advocate_report, final_recommendation, user_decision, user_reflection, market_context, global_conviction) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            item.id, item.timestamp, item.analyst_report, item.devil_advocate_report, item.final_recommendation, item.user_decision, item.user_reflection, item.market_context, item.global_conviction
           );
         }
       }
 
-      // 6. Logs de transacciones
-      if (Array.isArray(data.logs)) {
-        for (const item of data.logs) {
+      // 4. Laboratorio Vivo - Calibración/Insights
+      if (Array.isArray(data.learning_insights)) {
+        for (const item of data.learning_insights) {
           await db.run(
-            'INSERT INTO logs (id, level, message, agent, timestamp) VALUES (?, ?, ?, ?, ?)',
-            item.id, item.level, item.message, item.agent, item.timestamp
+            'INSERT INTO learning_insights (id, timestamp, type, insight, impact_level, applied) VALUES (?, ?, ?, ?, ?, ?)',
+            item.id, item.timestamp, item.type, item.insight, item.impact_level, item.applied
           );
         }
       }
 
       await db.run('COMMIT');
-      res.json({ success: true, message: 'La base de memoria ha sido restaurada con éxito.' });
+      res.json({ success: true, message: 'La memoria táctica de Portafolio y Laboratorio Vivo ha sido restaurada con éxito.' });
     } catch (error: any) {
       try {
         await db.run('ROLLBACK');
       } catch (e) {}
       console.error('Import error:', error);
-      res.status(500).json({ error: 'Error crítico importando memoria física en SQLite3: ' + error.message });
+      res.status(500).json({ error: 'Error crítico importando memoria física de portafolio/laboratorio en SQLite3: ' + error.message });
     }
   });
 

@@ -21,20 +21,16 @@ import {
 interface BackupData {
   system_identifier: string;
   exported_at: string;
-  config: any[];
-  etfs: any[];
-  platform_improvements: any[];
-  recommendations_24h: any[];
-  logs: any[];
+  portfolio: any[];
+  recommendations: any[];
+  learning_insights: any[];
 }
 
 export default function DataManagementPanel() {
   const [dbStats, setDbStats] = useState({
-    config: 0,
-    etfs: 0,
-    platform_improvements: 0,
-    recommendations_24h: 0,
-    logs: 0,
+    portfolio: 0,
+    recommendations: 0,
+    learning_insights: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,11 +60,9 @@ export default function DataManagementPanel() {
       const data: BackupData = await res.json();
       setExportPreview(data);
       setDbStats({
-        config: data.config?.length || 0,
-        etfs: data.etfs?.length || 0,
-        platform_improvements: data.platform_improvements?.length || 0,
-        recommendations_24h: data.recommendations_24h?.length || 0,
-        logs: data.logs?.length || 0,
+        portfolio: data.portfolio?.length || 0,
+        recommendations: data.recommendations?.length || 0,
+        learning_insights: data.learning_insights?.length || 0,
       });
     } catch (err: any) {
       setError(err.message || 'Error desconocido al cargar las estadísticas.');
@@ -119,8 +113,8 @@ export default function DataManagementPanel() {
         const parsed = JSON.parse(text) as BackupData;
         
         // Validation
-        if (parsed.system_identifier !== "PROMETHEUS_MEMORY_BACKUP_V5") {
-          throw new Error("El archivo no tiene el identificador de sistema 'PROMETHEUS_MEMORY_BACKUP_V5'. Es incompatible.");
+        if (parsed.system_identifier !== "PROMETHEUS_TACTICAL_MEMORY_V5") {
+          throw new Error("El archivo no tiene el identificador de sistema 'PROMETHEUS_TACTICAL_MEMORY_V5'. Es incompatible.");
         }
         
         setImportPreviewData(parsed);
@@ -191,7 +185,7 @@ export default function DataManagementPanel() {
             Gestión de Datos y Calibración de Memoria
           </h2>
           <p className="text-xs text-gray-400 font-mono mt-1">
-            Módulo oficial de portabilidad para auditar, respaldar y sincronizar heurísticas de decisión del núcleo matemático de Prometheus.
+            Módulo oficial de portabilidad para respaldar y sincronizar exclusivamente el estado de "Mi Portafolio" y "LABORATORIO VIVO: MEMORIA Y EVOLUCIÓN".
           </p>
         </div>
         
@@ -216,50 +210,32 @@ export default function DataManagementPanel() {
       )}
 
       {/* Database State Dashboard Row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-[#0F0F0F] border border-[#222] p-4 rounded-sm space-y-1">
           <div className="flex items-center justify-between text-gray-500">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Configuraciones</span>
-            <Settings className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Mi Portafolio</span>
+            <TrendingUp className="w-3.5 h-3.5 text-orange-400" />
           </div>
-          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.config}</p>
-          <p className="text-[9px] font-mono text-gray-500">Pesos del Algoritmo GICS</p>
+          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.portfolio}</p>
+          <p className="text-[9px] font-mono text-gray-500">Estados de asignaciones y cajas</p>
         </div>
 
         <div className="bg-[#0F0F0F] border border-[#222] p-4 rounded-sm space-y-1">
           <div className="flex items-center justify-between text-gray-500">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Unidades ETF</span>
-            <TrendingUp className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Laboratorio Vivo - Decisiones</span>
+            <CheckCircle className="w-3.5 h-3.5 text-orange-400" />
           </div>
-          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.etfs}</p>
-          <p className="text-[9px] font-mono text-gray-500">Activos Maquetados</p>
+          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.recommendations}</p>
+          <p className="text-[9px] font-mono text-gray-500">Histórico de aprobaciones y desestimaciones</p>
         </div>
 
         <div className="bg-[#0F0F0F] border border-[#222] p-4 rounded-sm space-y-1">
           <div className="flex items-center justify-between text-gray-500">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Mejoras de Plataforma</span>
-            <Users className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Laboratorio Vivo - Calibración Neural</span>
+            <Database className="w-3.5 h-3.5 text-orange-400" />
           </div>
-          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.platform_improvements}</p>
-          <p className="text-[9px] font-mono text-gray-500">Propuestas del Backlog</p>
-        </div>
-
-        <div className="bg-[#0F0F0F] border border-[#222] p-4 rounded-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-500">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Señales 24H</span>
-            <Database className="w-3.5 h-3.5 text-gray-400" />
-          </div>
-          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.recommendations_24h}</p>
-          <p className="text-[9px] font-mono text-gray-500">Histórico de Señales</p>
-        </div>
-
-        <div className="bg-[#0F0F0F] border border-[#222] p-4 rounded-sm col-span-2 md:col-span-1 space-y-1">
-          <div className="flex items-center justify-between text-gray-500">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Registros de Auditoría</span>
-            <Terminal className="w-3.5 h-3.5 text-gray-400" />
-          </div>
-          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.logs}</p>
-          <p className="text-[9px] font-mono text-gray-500">Logs de Transacciones</p>
+          <p className="text-2xl font-black text-white">{loading ? '...' : dbStats.learning_insights}</p>
+          <p className="text-[9px] font-mono text-gray-500">Insights heurísticos y ajustes dinámicos</p>
         </div>
       </div>
 
@@ -273,7 +249,7 @@ export default function DataManagementPanel() {
                 Exportar Memoria Táctica
               </h3>
               <p className="text-xs text-gray-300 leading-relaxed">
-                Descargue un archivo estructurado en formato JSON que almacena el estado completo de las calibraciones del robot, el histórico persistente de señales dadas por el debate del Pentágono, y el backlog de hito técnico cargado. Se puede usar para restablecer la máquina en cualquier instante.
+                Descargue un archivo estructurado en formato JSON que almacena el estado de "Mi Portafolio" y "LABORATORIO VIVO: MEMORIA Y EVOLUCIÓN". Úselo para salvaguardar y transferir el aprendizaje adaptativo del sistema.
               </p>
             </div>
 
@@ -308,34 +284,20 @@ export default function DataManagementPanel() {
                     <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
                     <span className="text-gray-200 font-semibold">Metadata de Cabecera</span>
                   </div>
-                  <span className="font-mono text-gray-400 text-[10.5px]">ID: PROMETHEUS_MEMORY_BACKUP_V5</span>
+                  <span className="font-mono text-gray-400 text-[10.5px]">ID: PROMETHEUS_TACTICAL_MEMORY_V5</span>
                 </div>
 
                 <div className="p-3 space-y-2">
                   <div className="flex items-center justify-between text-gray-200">
-                    <span className="font-bold">Esquema Config:</span>
-                    <span className="text-gray-400 font-mono">{dbStats.config} llaves</span>
+                    <span className="font-bold">Mi Portafolio (Últimos Estados):</span>
+                    <span className="text-gray-400 font-mono">{dbStats.portfolio} registros</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5 bg-[#121212] p-2 rounded-xs border border-[#1C1C1C] font-mono text-[10px] text-gray-300">
-                    <div>rotation_weight_momentum:</div>
-                    <div className="text-right text-orange-400 font-bold">0.6</div>
-                    <div>rotation_weight_volatility:</div>
-                    <div className="text-right text-orange-400 font-bold">0.2</div>
-                  </div>
-                </div>
-
-                <div className="p-3 space-y-1.5">
-                  <div className="flex items-center justify-between text-gray-200">
-                    <span className="font-bold">Muestra Histórico de Señales (Últimas 2):</span>
-                    <span className="text-gray-400 font-mono">{dbStats.recommendations_24h} registros</span>
-                  </div>
-                  {exportPreview?.recommendations_24h && exportPreview.recommendations_24h.length > 0 ? (
+                  {exportPreview?.portfolio && exportPreview.portfolio.length > 0 ? (
                     <div className="space-y-1 bg-[#121212] p-2 rounded-xs border border-[#1C1C1C] text-[10.5px]">
-                      {exportPreview.recommendations_24h.slice(0, 2).map((rec, i) => (
-                        <div key={i} className="flex justify-between items-center text-gray-300 border-b border-[#222]/30 last:border-0 pb-1 last:pb-0">
-                          <span className="font-semibold truncate max-w-[120px]">{rec.sector_lider}</span>
-                          <span className="text-[9.5px] font-mono text-gray-400">{rec.action}</span>
-                          <span className="bg-orange-950/40 text-orange-300 font-mono text-[9px] px-1 rounded-sm border border-orange-500/20 font-bold">{rec.score} pts</span>
+                      {exportPreview.portfolio.slice(0, 2).map((port, i) => (
+                        <div key={i} className="flex justify-between items-center text-gray-300 border-b border-[#222]/30 last:border-0 pb-1 last:pb-0 font-mono">
+                          <span className="text-white">Valor: ${parseFloat(port.total_value).toLocaleString()}</span>
+                          <span className="text-gray-400">Efectivo: ${parseFloat(port.cash).toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
@@ -346,21 +308,39 @@ export default function DataManagementPanel() {
 
                 <div className="p-3 space-y-1.5">
                   <div className="flex items-center justify-between text-gray-200">
-                    <span className="font-bold">Primeras Mejoras en el Backlog:</span>
-                    <span className="text-gray-400 font-mono">{dbStats.platform_improvements} hilos</span>
+                    <span className="font-bold">Laboratorio Vivo (Decisiones):</span>
+                    <span className="text-gray-400 font-mono">{dbStats.recommendations} registros</span>
                   </div>
-                  {exportPreview?.platform_improvements && exportPreview.platform_improvements.length > 0 ? (
+                  {exportPreview?.recommendations && exportPreview.recommendations.length > 0 ? (
                     <div className="space-y-1 bg-[#121212] p-2 rounded-xs border border-[#1C1C1C] text-[10.5px]">
-                      {exportPreview.platform_improvements.slice(0, 2).map((imp, i) => (
+                      {exportPreview.recommendations.slice(0, 2).map((rec, i) => (
                         <div key={i} className="flex justify-between items-center text-gray-300 border-b border-[#222]/30 last:border-0 pb-1 last:pb-0">
-                          <span className="truncate max-w-[160px] font-medium text-white">{imp.title}</span>
-                          <span className="text-purple-400 font-bold text-[9px]">{imp.impact}</span>
-                          <span className="text-green-400 text-[10px] font-mono">{imp.status}</span>
+                          <span className={`${rec.user_decision === 'ACEPTADA' ? 'text-green-400' : 'text-red-400'} font-bold`}>{rec.user_decision}</span>
+                          <span className="text-[10px] text-gray-400 truncate max-w-[180px]">{rec.user_reflection}</span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <span className="text-gray-600 italic">No hay backlog cargado.</span>
+                    <span className="text-gray-600 italic">No hay registros de decisiones cargados.</span>
+                  )}
+                </div>
+
+                <div className="p-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-gray-200">
+                    <span className="font-bold">Laboratorio Vivo (Calibración Neural):</span>
+                    <span className="text-gray-400 font-mono">{dbStats.learning_insights} insights</span>
+                  </div>
+                  {exportPreview?.learning_insights && exportPreview.learning_insights.length > 0 ? (
+                    <div className="space-y-1 bg-[#121212] p-2 rounded-xs border border-[#1C1C1C] text-[10.5px]">
+                      {exportPreview.learning_insights.slice(0, 2).map((ins, i) => (
+                        <div key={i} className="flex justify-between items-center text-gray-300 border-b border-[#222]/30 last:border-0 pb-1 last:pb-0">
+                          <span className="truncate max-w-[160px] font-medium text-white">{ins.insight}</span>
+                          <span className="text-orange-400 text-[10px] font-mono">{ins.type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-600 italic">No hay calibraciones cargadas.</span>
                   )}
                 </div>
               </div>
@@ -372,7 +352,7 @@ export default function DataManagementPanel() {
             <div className="bg-[#0F0F0F] border border-[#222] p-5 rounded-sm space-y-3">
               <div className="flex items-center justify-between border-b border-[#222] pb-2">
                 <span className="text-xs font-mono font-bold text-orange-400 uppercase">Visor Interactivo JSON Real-Time</span>
-                <span className="text-[10px] font-mono text-gray-500">Formato Símil SQLite-Data Matrix</span>
+                <span className="text-[10px] font-mono text-gray-500">Capa de persistencia táctica</span>
               </div>
               <pre className="max-h-[300px] overflow-y-auto bg-[#070707] border border-[#222] p-3 rounded-sm font-mono text-[10.5px] text-[#A3E635] selection:bg-orange-500/20 leading-relaxed custom-scrollbar text-left">
                 {JSON.stringify(exportPreview, null, 2)}
@@ -390,7 +370,7 @@ export default function DataManagementPanel() {
                 Importar Memoria de Prometheus
               </h3>
               <p className="text-xs text-gray-300 leading-relaxed">
-                Suba una copia de seguridad válida para calibrar la memoria cognitiva de la plataforma. Al confirmar la acción, se realizará una restauración transaccional completa. Se sobreescriben de forma segura las configuraciones, el backlog y el histórico de recomendaciones de 24h.
+                Suba una copia de seguridad táctica válida (.json). Al confirmar la restauración, se rescribirán por completo "Mi Portafolio" y todas las variables cognitivas del "Laboratorio Vivo".
               </p>
             </div>
 
@@ -448,29 +428,21 @@ export default function DataManagementPanel() {
 
                 <div className="space-y-2 mt-2">
                   <p className="text-[11px] text-gray-400">
-                    Se han validado los esquemas. La plataforma reestructurará las siguientes tablas físicas:
+                    Se han validado los esquemas. La plataforma reestructurará las siguientes tablas tácticas:
                   </p>
 
                   <div className="space-y-1.5 font-mono text-[10.5px]">
                     <div className="flex items-center justify-between p-1.5 bg-[#0F0F0F] rounded-xs border border-[#1C1C1C]">
-                      <span className="text-gray-300">⚙️ Configs de Rotación:</span>
-                      <span className="text-white font-bold">{importPreviewData.config?.length || 0} registros nuevos</span>
+                      <span className="text-gray-300">📁 Mi Portafolio:</span>
+                      <span className="text-white font-bold">{importPreviewData.portfolio?.length || 0} estados nuevos</span>
                     </div>
                     <div className="flex items-center justify-between p-1.5 bg-[#0F0F0F] rounded-xs border border-[#1C1C1C]">
-                      <span className="text-gray-300">📈 Activos ETF Registrados:</span>
-                      <span className="text-white font-bold">{importPreviewData.etfs?.length || 0} activos</span>
+                      <span className="text-gray-300">🧠 Laboratorio Vivo (Decisiones):</span>
+                      <span className="text-white font-bold">{importPreviewData.recommendations?.length || 0} decisiones</span>
                     </div>
                     <div className="flex items-center justify-between p-1.5 bg-[#0F0F0F] rounded-xs border border-[#1C1C1C]">
-                      <span className="text-gray-300">👥 Backlog de Propuestas:</span>
-                      <span className="text-white font-bold">{importPreviewData.platform_improvements?.length || 0} hilos</span>
-                    </div>
-                    <div className="flex items-center justify-between p-1.5 bg-[#0F0F0F] rounded-xs border border-[#1C1C1C]">
-                      <span className="text-gray-300">💡 Señales Tácticas 24H:</span>
-                      <span className="text-white font-bold">{importPreviewData.recommendations_24h?.length || 0} señales</span>
-                    </div>
-                    <div className="flex items-center justify-between p-1.5 bg-[#0F0F0F] rounded-xs border border-[#1C1C1C]">
-                      <span className="text-gray-300">📝 Logs de Transacción:</span>
-                      <span className="text-white font-bold">{importPreviewData.logs?.length || 0} líneas</span>
+                      <span className="text-gray-300">🧬 Laboratorio Vivo (Calibraciones):</span>
+                      <span className="text-white font-bold">{importPreviewData.learning_insights?.length || 0} insights</span>
                     </div>
                   </div>
                 </div>
@@ -502,7 +474,7 @@ export default function DataManagementPanel() {
               Cláusulas de Integridad & Calibración
             </h4>
             <p className="text-[11px] text-gray-300 leading-relaxed font-semibold">
-              El proceso de importación ejecuta operaciones atómicas complejas. Se recomienda detener cualquier rebalanceo activo o cálculo paralelo para evitar conflictos de concurrencia en la base SQLite.
+              El proceso de importación ejecuta operaciones atómicas complejas sobre "Mi Portafolio" y "Laboratorio Vivo". Se recomienda detener cualquier rebalanceo activo o cálculo paralelo para evitar conflictos de concurrencia en la base SQLite.
             </p>
             <div className="p-3 bg-[#141414] border border-[#222] rounded-xs text-[10px] font-mono text-orange-400 leading-relaxed font-bold">
               "sqlite_master: integrity_check ok - todos los índices de memoria se reconstruyen óptimamente en tiempo real."

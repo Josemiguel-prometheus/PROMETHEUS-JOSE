@@ -1920,7 +1920,7 @@ elif menu == "Historial & Aprendizaje":
 
 elif menu == "Gestión de Datos":
     st.markdown('<div class="bloomberg-header font-sans" style="font-size: 24px; font-weight: 700; color: #f97316;">📁 GESTIÓN DE DATOS Y CALIBRACIÓN DE MEMORIA</div>', unsafe_allow_html=True)
-    st.caption("Interconecte y traslade el estado de aprendizaje, calibraciones y logs operativos de la plataforma Prometheus.")
+    st.caption("Interconecte y traslade exclusivamente el estado de 'Mi Portafolio' y 'LABORATORIO VIVO: MEMORIA Y EVOLUCIÓN'.")
 
     # 1. Recuperar counts de las tablas actuales
     conn = sqlite3.connect('prometheus_intelligence.db')
@@ -1928,13 +1928,9 @@ elif menu == "Gestión de Datos":
     
     # Obtener totales de tabulaciones de datos
     tables_to_manage = {
-        "recommendations": "Consejos del Pentágono",
-        "system_logs": "Logs del Supervisor",
-        "portfolio": "Portafolios Históricos",
-        "learning_insights": "Evolución e Insights",
-        "settings_history": "Configuraciones de Riesgo",
-        "recommendations_24h": "Señales Diarias",
-        "platform_improvements": "Backlog de Mejoras"
+        "portfolio": "Mi Portafolio",
+        "recommendations": "Laboratorio Vivo (Decisiones)",
+        "learning_insights": "Laboratorio Vivo (Calibraciones)"
     }
     
     stats = {}
@@ -1948,29 +1944,23 @@ elif menu == "Gestión de Datos":
     conn.close()
 
     # Mostrar métricas de densidad de memoria
-    col_st1, col_st2, col_st3, col_st4 = st.columns(4)
+    col_st1, col_st2, col_st3 = st.columns(3)
     with col_st1:
-        st.metric("Señales e Insights", f"{stats['recommendations_24h'] + stats['learning_insights']} refs")
+        st.metric("Mi Portafolio", f"{stats['portfolio']} estados")
     with col_st2:
-        st.metric("Mejoras de Software", f"{stats['platform_improvements']} hilos")
+        st.metric("LV - Decisiones", f"{stats['recommendations']} registros")
     with col_st3:
-        st.metric("Portafolios Guardados", f"{stats['portfolio']} estados")
-    with col_st4:
-        st.metric("Registros de Bitácora", f"{stats['system_logs']} líneas")
+        st.metric("LV - Calibraciones", f"{stats['learning_insights']} insights")
 
     st.markdown('<div style="margin: 15px 0;"></div>', unsafe_allow_html=True)
 
     # Preparar el JSON para la exportación
     export_data = {
-        "system_identifier": "PROMETHEUS_CORE_MEMORY_PY_V5",
+        "system_identifier": "PROMETHEUS_TACTICAL_MEMORY_V5",
         "exported_at": datetime.now().isoformat(),
-        "recommendations": [],
-        "system_logs": [],
         "portfolio": [],
-        "learning_insights": [],
-        "settings_history": [],
-        "recommendations_24h": [],
-        "platform_improvements": []
+        "recommendations": [],
+        "learning_insights": []
     }
 
     try:
@@ -1987,14 +1977,14 @@ elif menu == "Gestión de Datos":
     with col_exp:
         st.markdown('<div style="background-color:#0F0F0F; padding: 20px; border: 1px solid #222; border-radius: 4px; height: 100%;">', unsafe_allow_html=True)
         st.markdown('<h3 style="margin-top:0; color:#fff; font-size:15px; font-weight:bold; text-transform:uppercase;">📦 Descargar Registro de Memoria</h3>', unsafe_allow_html=True)
-        st.write("Exporte el estado de calibración y análisis de los agentes a un archivo portable JSON.")
+        st.write("Exporte el estado táctico del portafolio y los aprendizajes del Laboratorio Vivo a un archivo portable JSON.")
         
         json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
         
         st.download_button(
             label="📥 EXPORTAR MEMORIA JSON",
             data=json_str,
-            file_name=f"PROMETHEUS_CORE_MEMORY_{datetime.now().strftime('%Y%m%d')}.json",
+            file_name=f"PROMETHEUS_TACTICAL_MEMORY_{datetime.now().strftime('%Y%m%d')}.json",
             mime="application/json",
             use_container_width=True
         )
@@ -2003,19 +1993,19 @@ elif menu == "Gestión de Datos":
         st.markdown("#### **Visualización Previa del Backing-Up**")
         st.markdown(f"**Identificador de la Estructura:** `{export_data['system_identifier']}`")
         
-        preview_tabs = st.tabs(["💡 Señales", "🛠️ Backlog", "📁 Registro Raw"])
+        preview_tabs = st.tabs(["📁 Mi Portafolio", "🧠 Decisiones", "📁 Registro Raw"])
         with preview_tabs[0]:
-            if export_data["recommendations_24h"]:
-                for rec in export_data["recommendations_24h"][:2]:
-                    st.markdown(f"**{rec.get('sector_lider', 'Indefinido')}:** {rec.get('action', '')} ({rec.get('score', 0)} pts) - *{rec.get('timestamp', '')}*")
+            if export_data["portfolio"]:
+                for port in export_data["portfolio"][:2]:
+                    st.markdown(f"**Val: ${float(port.get('total_value', 0)):,.2f}** - Efvo: ${float(port.get('cash', 0)):,.2f} (*{port.get('timestamp', '')}*)")
             else:
-                st.write("Sin señales tacticas registradas.")
+                st.write("Sin registros en Mi Portafolio.")
         with preview_tabs[1]:
-            if export_data["platform_improvements"]:
-                for imp in export_data["platform_improvements"][:2]:
-                    st.markdown(f"**{imp.get('title', 'Mejora')}** ({imp.get('status', '')}) - Impacto: {imp.get('impact', '')}")
+            if export_data["recommendations"]:
+                for rec in export_data["recommendations"][:2]:
+                    st.markdown(f"**{rec.get('user_decision', 'Indefinida')}**: {rec.get('user_reflection', '')[:80]}...")
             else:
-                st.write("Sin mejoras de backlog cargadas.")
+                st.write("Sin registros de decisiones del Laboratorio Vivo.")
         with preview_tabs[2]:
             st.code(json_str[:600] + "\n\n... [Contenido truncado] ...", language="json")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -2030,19 +2020,15 @@ elif menu == "Gestión de Datos":
         if uploaded_file is not None:
             try:
                 imported_json = json.load(uploaded_file)
-                if imported_json.get("system_identifier") != "PROMETHEUS_CORE_MEMORY_PY_V5":
-                    st.error("Error: El archivo suministrado no cuenta con el identificador compatible 'PROMETHEUS_CORE_MEMORY_PY_V5'.")
+                if imported_json.get("system_identifier") != "PROMETHEUS_TACTICAL_MEMORY_V5":
+                    st.error("Error: El archivo suministrado no cuenta con el identificador compatible 'PROMETHEUS_TACTICAL_MEMORY_V5'.")
                 else:
                     st.success("¡Estructura de la copia de seguridad validada exitosamente!")
                     
                     st.markdown("#### **Resumen de datos a Inyectar**")
-                    st.write(f"- 👥 Consejos del Pentágono: **{len(imported_json.get('recommendations', []))}**")
-                    st.write(f"- 📝 Logs de Transacción: **{len(imported_json.get('system_logs', []))}**")
-                    st.write(f"- 📁 Portafolios: **{len(imported_json.get('portfolio', []))}**")
-                    st.write(f"- 💡 Insights e Aprendizaje: **{len(imported_json.get('learning_insights', []))}**")
-                    st.write(f"- ⚙️ Histórico Configuraciones: **{len(imported_json.get('settings_history', []))}**")
-                    st.write(f"- ⚡ Señales Tácticas 24h: **{len(imported_json.get('recommendations_24h', []))}**")
-                    st.write(f"- 🛠️ Backlog de Mejoras: **{len(imported_json.get('platform_improvements', []))}**")
+                    st.write(f"- 📁 Mi Portafolio: **{len(imported_json.get('portfolio', []))}**")
+                    st.write(f"- 🧠 Laboratorio Vivo (Decisiones): **{len(imported_json.get('recommendations', []))}**")
+                    st.write(f"- 🧬 Laboratorio Vivo (Calibraciones): **{len(imported_json.get('learning_insights', []))}**")
                     
                     if st.button("🔥 CONFIRMAR E INYECTAR MEMORIA", use_container_width=True):
                         conn_imp = sqlite3.connect('prometheus_intelligence.db')
@@ -2052,20 +2038,13 @@ elif menu == "Gestión de Datos":
                             for t_name in tables_to_manage.keys():
                                 cur_imp.execute(f"DELETE FROM {t_name}")
                             
-                            # Re-insertar recommendations
+                            # recommendations
                             for row in imported_json.get('recommendations', []):
                                 cur_imp.execute("""
                                     INSERT INTO recommendations (id, timestamp, analyst_report, devil_advocate_report, final_recommendation, user_decision, user_reflection, market_context, global_conviction)
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 """, (row.get('id'), row.get('timestamp'), row.get('analyst_report'), row.get('devil_advocate_report'), row.get('final_recommendation'), row.get('user_decision'), row.get('user_reflection'), row.get('market_context'), row.get('global_conviction')))
                             
-                            # system_logs
-                            for row in imported_json.get('system_logs', []):
-                                cur_imp.execute("""
-                                    INSERT INTO system_logs (id, timestamp, level, module, message)
-                                    VALUES (?, ?, ?, ?, ?)
-                                """, (row.get('id'), row.get('timestamp'), row.get('level'), row.get('module'), row.get('message')))
-
                             # portfolio
                             for row in imported_json.get('portfolio', []):
                                 cur_imp.execute("""
@@ -2079,27 +2058,6 @@ elif menu == "Gestión de Datos":
                                     INSERT INTO learning_insights (id, timestamp, type, insight, impact_level, applied)
                                     VALUES (?, ?, ?, ?, ?, ?)
                                 """, (row.get('id'), row.get('timestamp'), row.get('type'), row.get('insight'), row.get('impact_level'), row.get('applied')))
-
-                            # settings_history
-                            for row in imported_json.get('settings_history', []):
-                                cur_imp.execute("""
-                                    INSERT INTO settings_history (id, timestamp, weights, perfil, reason)
-                                    VALUES (?, ?, ?, ?, ?)
-                                """, (row.get('id'), row.get('timestamp'), row.get('weights'), row.get('perfil'), row.get('reason')))
-
-                            # recommendations_24h
-                            for row in imported_json.get('recommendations_24h', []):
-                                cur_imp.execute("""
-                                    INSERT INTO recommendations_24h (id, timestamp, sector_lider, score, vix_at_generation, action, report, conviction)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                                """, (row.get('id'), row.get('timestamp'), row.get('sector_lider'), row.get('score'), row.get('vix_at_generation'), row.get('action'), row.get('report'), row.get('conviction')))
-
-                            # platform_improvements
-                            for row in imported_json.get('platform_improvements', []):
-                                cur_imp.execute("""
-                                    INSERT INTO platform_improvements (id, category, title, description, votes, status, impact, github_milestone)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                                """, (row.get('id'), row.get('category'), row.get('title'), row.get('description'), row.get('votes'), row.get('status'), row.get('impact'), row.get('github_milestone')))
 
                             conn_imp.commit()
                             st.success("¡Base de datos/Memoria cargada y sincronizada correctamente!")
