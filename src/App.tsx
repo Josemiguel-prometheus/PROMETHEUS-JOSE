@@ -11,8 +11,7 @@ import {
   Clock,
   RefreshCw,
   AlertTriangle,
-  Scale,
-  Sparkles
+  Scale
 } from 'lucide-react';
 import { cn } from './lib/utils';
 
@@ -26,12 +25,10 @@ import HistoryPanel from './components/HistoryPanel';
 import ConfigPanel from './components/ConfigPanel';
 import DevilAdvocatePanel from './components/DevilAdvocatePanel';
 import Recommendations24hPanel from './components/Recommendations24hPanel';
-import PrometheusAIPanel from './components/PrometheusAIPanel';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
   { id: 'recommendations24h', label: '💡 Señales 24H & Mejoras', icon: Clock },
-  { id: 'prometheus_ai', label: '🧠 Copiloto IA Prometheus', icon: Sparkles },
   { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
   { id: 'agents', label: 'Agentes', icon: Users },
@@ -139,7 +136,6 @@ export default function App() {
             >
               {activeTab === 'dashboard' && <Dashboard />}
               {activeTab === 'recommendations24h' && <Recommendations24hPanel />}
-              {activeTab === 'prometheus_ai' && <PrometheusAIPanel />}
               {activeTab === 'rotations' && <RotationsPanel />}
               {activeTab === 'quotes' && <RealTimeQuotes />}
               {activeTab === 'agents' && <AgentsPanel />}

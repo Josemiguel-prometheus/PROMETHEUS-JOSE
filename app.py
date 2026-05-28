@@ -331,7 +331,6 @@ with st.sidebar:
     menu = st.radio("SISTEMA CENTRAL", 
                     ["Dashboard Estratégico", 
                      "💡 Señales 24H & Mejoras",
-                     "🧠 Copiloto IA Prometheus",
                      "Pentágono de Agentes", 
                      "⚖️ Abogado del Diablo",
                      "Mi Portafolio",
@@ -462,12 +461,7 @@ elif menu == "💡 Señales 24H & Mejoras":
             st.write("Cargando o sin señal activa.")
         st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown("""
-        <div style="background-color: rgba(249,115,22,0.04); border: 1px solid rgba(249,115,22,0.15); border-radius: 4px; padding: 12px; margin-top: 15px; margin-bottom: 15px;">
-            <h5 style="margin:0 0 5px 0; color:#f97316; font-size:12px; font-weight:700; font-family:'JetBrains Mono';">🤖 COPILOTO IA PROMETHEUS ACTIVADO</h5>
-            <p style="margin:0; font-size:10.5px; color:#aaa; line-height:1.3;">Se ha configurado una central de IA dedicada para esta plataforma en el menú lateral. Seleccione "🧠 Copiloto IA Prometheus" para iniciar un debate econométrico avanzado.</p>
-        </div>
-        """, unsafe_allow_html=True)
+
 
         if st.button("🔄 Generar Nueva Señal Diaria (Forzar)", use_container_width=True):
             import random
@@ -561,77 +555,6 @@ elif menu == "💡 Señales 24H & Mejoras":
     if recs:
         df_recs = pd.DataFrame(recs)
         st.dataframe(df_recs[["timestamp", "sector_lider", "score", "vix_at_generation", "action", "conviction"]], use_container_width=True)
-
-elif menu == "🧠 Copiloto IA Prometheus":
-    st.markdown('<div class="bloomberg-header font-sans" style="font-size: 24px; font-weight: 700; color: #f97316;">🧠 COPILOTO IA PROMETHEUS</div>', unsafe_allow_html=True)
-    st.caption("Consulte en tiempo real al Copiloto de Inteligencia Artificial para debatir hipótesis, realizar análisis macro y auditar el backlog.")
-    
-    # Telemetry indicators
-    col_t1, col_t2, col_t3, col_t4 = st.columns(4)
-    with col_t1:
-        st.markdown('<div style="background-color:#0F0F0F; padding:10px; border:1px solid #222; border-radius:4px;"><span style="font-size:9px; color:#666; font-family:\'JetBrains Mono\'; text-transform:uppercase; display:block;">SISTEMA CORE</span><strong style="font-size:12px; color:#fff;">PROMETHEUS GPT</strong></div>', unsafe_allow_html=True)
-    with col_t2:
-        st.markdown('<div style="background-color:#0F0F0F; padding:10px; border:1px solid #222; border-radius:4px;"><span style="font-size:9px; color:#666; font-family:\'JetBrains Mono\'; text-transform:uppercase; display:block;">CONEXIÓN DE DATOS</span><strong style="font-size:12px; color:#10B981;">SI (CORE DIRECT)</strong></div>', unsafe_allow_html=True)
-    with col_t3:
-        st.markdown('<div style="background-color:#0F0F0F; padding:10px; border:1px solid #222; border-radius:4px;"><span style="font-size:9px; color:#666; font-family:\'JetBrains Mono\'; text-transform:uppercase; display:block;">VOLATILIDAD VIX</span><strong style="font-size:12px; color:#F59E0B;">MONITOREADA</strong></div>', unsafe_allow_html=True)
-    with col_t4:
-        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
-        if st.button("🧹 LIMPIAR CHAT", use_container_width=True):
-            st.session_state.chat_history_py = [
-                {"role": "assistant", "content": "### 🧠 COPILOTO EXPERTO DE LA PLATAFORMA PROMETHEUS\nBienvenido, Ingeniero. Soy **Prometheus IA**, el agente cognitivo de nivel superior y custodio de la arquitectura de este ecosistema.\n\nEstoy **altamente entrenado** y de manera **exclusiva** para guiarte en:\n- 🛠️ **Arquitectura del Sistema**: Estructura general de Express, Vite/React, Streamlit y base de datos SQLite.\n- ⚙️ **Algoritmo de Rotación**: Formulación de momentum sectorial y mitigación de cola según el VIX.\n- 🤖 **Debate de Agentes (lib/agents.ts)**: El flujo consultivo del Pentágono entre el Analista, Supervisor y Revisor del Diablo.\n- 🗄️ **Base de Datos & Backlog**: Análisis crítico de propuestas y mejoras de ingeniería.\n\n¿Qué consulta técnica deseas iniciar hoy?"}
-            ]
-            st.success("Historial de chat restablecido.")
-            st.rerun()
-
-    st.markdown('<div style="margin: 15px 0;"></div>', unsafe_allow_html=True)
-
-    # Render Chat History
-    for m in st.session_state.chat_history_py:
-        with st.chat_message(m["role"]):
-            st.markdown(m["content"])
-
-    # Quick prompt triggers (preset queries)
-    st.markdown('<div style="margin-top:20px; font-size:10px; color:#f97316; font-family:\'JetBrains Mono\'; font-weight:bold; text-transform:uppercase">Sugerencias de Consulta Rápida:</div>', unsafe_allow_html=True)
-    col_p1, col_p2, col_p3, col_p4 = st.columns(4)
-    with col_p1:
-        if st.button("📂 Arquitectura", use_container_width=True, help="Auditar estructura general de la base de código y Express/Vite."):
-            st.session_state.chat_history_py.append({"role": "user", "content": "Explícame detalladamente la arquitectura técnica del sistema, incluyendo los archivos server.ts, app.py, lib/agents.ts y cómo colaboran en conjunto."})
-            with st.spinner("Compilando mapa de arquitectura..."):
-                ans = query_gemini_py(st.session_state.chat_history_py)
-                st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
-            st.rerun()
-    with col_p2:
-        if st.button("⚙️ Algoritmo GICS", use_container_width=True, help="Revisar ecuación del algoritmo de rotación y mitigación de volatilidad."):
-            st.session_state.chat_history_py.append({"role": "user", "content": "¿Cuál es la fórmula matemática del algoritmo de rotación de ETFs y cómo reacciona cuantitativamente según las métricas del VIX?"})
-            with st.spinner("Analizando ecuaciones algorítmicas..."):
-                ans = query_gemini_py(st.session_state.chat_history_py)
-                st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
-            st.rerun()
-    with col_p3:
-        if st.button("🤖 Agentes", use_container_width=True, help="Ver debate y orquestación del Pentágono de Agentes de lib/agents.ts."):
-            st.session_state.chat_history_py.append({"role": "user", "content": "Detalla el rol y funcionamiento cíclico de los tres agentes del sistema (Analista, Supervisor y Abogado del Diablo) detallados en lib/agents.ts."})
-            with st.spinner("Sincronizando flujo de debate..."):
-                ans = query_gemini_py(st.session_state.chat_history_py)
-                st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
-            st.rerun()
-    with col_p4:
-        if st.button("🛠️ Backlog & DB", use_container_width=True, help="Consultar propuestas de base de datos sqlite3 persistentemente."):
-            st.session_state.chat_history_py.append({"role": "user", "content": "Revisa críticamente las propuestas técnicas vigentes en el backlog sqlite3 y destaca cuáles tienen la mayor viabilidad e impacto."})
-            with st.spinner("Consultando base de datos SQLite..."):
-                ans = query_gemini_py(st.session_state.chat_history_py)
-                st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
-            st.rerun()
-
-    # Chat input box
-    if prompt := st.chat_input("Escriba su consulta o analice una hipótesis con Prometheus IA..."):
-        st.session_state.chat_history_py.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        with st.chat_message("assistant"):
-            with st.spinner("Razonando respuesta..."):
-                ans = query_gemini_py(st.session_state.chat_history_py)
-                st.session_state.chat_history_py.append({"role": "assistant", "content": ans})
-                st.rerun()
 
 elif menu == "Pentágono de Agentes":
     st.markdown('<div class="bloomberg-header">PENTÁGONO DE INTELIGENCIA COGNITIVA</div>', unsafe_allow_html=True)
