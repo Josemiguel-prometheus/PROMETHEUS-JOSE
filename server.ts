@@ -350,6 +350,101 @@ async function startServer() {
     }
   });
 
+  // Endpoints de Gestión de Datos y Memoria de Prometheus
+  app.get('/api/data-management/export', async (req, res) => {
+    try {
+      const config = await db.all('SELECT * FROM config');
+      const etfs = await db.all('SELECT * FROM etfs');
+      const platform_improvements = await db.all('SELECT * FROM platform_improvements');
+      const recommendations_24h = await db.all('SELECT * FROM recommendations_24h');
+      const logs = await db.all('SELECT * FROM logs');
+
+      res.json({
+        system_identifier: "PROMETHEUS_MEMORY_BACKUP_V5",
+        exported_at: new Date().toISOString(),
+        config,
+        etfs,
+        platform_improvements,
+        recommendations_24h,
+        logs
+      });
+    } catch (error: any) {
+      console.error('Export error:', error);
+      res.status(500).json({ error: 'Fallo al exportar los datos base de Prometheus: ' + error.message });
+    }
+  });
+
+  app.post('/api/data-management/import', async (req, res) => {
+    const data = req.body;
+    if (!data || data.system_identifier !== "PROMETHEUS_MEMORY_BACKUP_V5") {
+      return res.status(400).json({ error: 'La copia de seguridad no es válida o no corresponde al formato de la plataforma Prometheus.' });
+    }
+
+    try {
+      await db.run('BEGIN TRANSACTION');
+
+      // 1. Limpiar estructuras actuales de memoria
+      await db.run('DELETE FROM config');
+      await db.run('DELETE FROM etfs');
+      await db.run('DELETE FROM platform_improvements');
+      await db.run('DELETE FROM recommendations_24h');
+      await db.run('DELETE FROM logs');
+
+      // 2. Configuración
+      if (Array.isArray(data.config)) {
+        for (const item of data.config) {
+          await db.run('INSERT INTO config (key, value) VALUES (?, ?)', item.key, item.value);
+        }
+      }
+
+      // 3. ETFs
+      if (Array.isArray(data.etfs)) {
+        for (const item of data.etfs) {
+          await db.run('INSERT INTO etfs (ticker, name, sector, added_at) VALUES (?, ?, ?, ?)', item.ticker, item.name, item.sector, item.added_at);
+        }
+      }
+
+      // 4. Mejoras del sistema / Backlog
+      if (Array.isArray(data.platform_improvements)) {
+        for (const item of data.platform_improvements) {
+          await db.run(
+            'INSERT INTO platform_improvements (id, category, title, description, votes, status, impact, github_milestone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            item.id, item.category, item.title, item.description, item.votes, item.status, item.impact, item.github_milestone
+          );
+        }
+      }
+
+      // 5. Historial de señales de rotación
+      if (Array.isArray(data.recommendations_24h)) {
+        for (const item of data.recommendations_24h) {
+          await db.run(
+            'INSERT INTO recommendations_24h (id, timestamp, sector_lider, score, vix_at_generation, action, report, conviction) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            item.id, item.timestamp, item.sector_lider, item.score, item.vix_at_generation, item.action, item.report, item.conviction
+          );
+        }
+      }
+
+      // 6. Logs de transacciones
+      if (Array.isArray(data.logs)) {
+        for (const item of data.logs) {
+          await db.run(
+            'INSERT INTO logs (id, level, message, agent, timestamp) VALUES (?, ?, ?, ?, ?)',
+            item.id, item.level, item.message, item.agent, item.timestamp
+          );
+        }
+      }
+
+      await db.run('COMMIT');
+      res.json({ success: true, message: 'La base de memoria ha sido restaurada con éxito.' });
+    } catch (error: any) {
+      try {
+        await db.run('ROLLBACK');
+      } catch (e) {}
+      console.error('Import error:', error);
+      res.status(500).json({ error: 'Error crítico importando memoria física en SQLite3: ' + error.message });
+    }
+  });
+
   // Chatbot Gemini Core Route
   app.post('/api/gemini/chat', async (req, res) => {
     const { messages } = req.body;

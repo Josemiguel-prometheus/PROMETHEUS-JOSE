@@ -11,7 +11,8 @@ import {
   Clock,
   RefreshCw,
   AlertTriangle,
-  Scale
+  Scale,
+  Database
 } from 'lucide-react';
 import { cn } from './lib/utils';
 
@@ -25,6 +26,7 @@ import HistoryPanel from './components/HistoryPanel';
 import ConfigPanel from './components/ConfigPanel';
 import DevilAdvocatePanel from './components/DevilAdvocatePanel';
 import Recommendations24hPanel from './components/Recommendations24hPanel';
+import DataManagementPanel from './components/DataManagementPanel';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
@@ -35,6 +37,7 @@ const TABS = [
   { id: 'devil', label: '⚖️ Abogado del diablo', icon: Scale },
   { id: 'supervisor', label: 'Supervisor', icon: ShieldCheck },
   { id: 'history', label: 'Historial y Análisis', icon: History },
+  { id: 'data_management', label: 'Gestión de Datos', icon: Database },
   { id: 'config', label: 'Configuración', icon: Settings },
 ];
 
@@ -142,6 +145,7 @@ export default function App() {
               {activeTab === 'devil' && <DevilAdvocatePanel />}
               {activeTab === 'supervisor' && <SupervisorPanel />}
               {activeTab === 'history' && <HistoryPanel />}
+              {activeTab === 'data_management' && <DataManagementPanel />}
               {activeTab === 'config' && <ConfigPanel />}
             </motion.div>
           </AnimatePresence>
