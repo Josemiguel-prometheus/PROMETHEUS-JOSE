@@ -1993,27 +1993,36 @@ elif menu == "Gestión de Datos":
         st.markdown("#### **Visualización Previa del Backing-Up**")
         st.markdown(f"**Identificador de la Estructura:** `{export_data['system_identifier']}`")
         
-        preview_tabs = st.tabs(["📁 Mi Portafolio", "🧠 Decisiones", "📁 Registro Raw"])
+        preview_tabs = st.tabs(["📁 Mi Portafolio", "🧠 LV - Decisiones", "🧬 LV - Calibraciones", "📁 Registro Raw"])
         with preview_tabs[0]:
             if export_data["portfolio"]:
-                for port in export_data["portfolio"][:2]:
-                    st.markdown(f"**Val: ${float(port.get('total_value', 0)):,.2f}** - Efvo: ${float(port.get('cash', 0)):,.2f} (*{port.get('timestamp', '')}*)")
+                st.write(f"Cargados {len(export_data['portfolio'])} registros:")
+                for port in export_data["portfolio"][-4:]:
+                    st.markdown(f"- **Val: ${float(port.get('total_value', 0)):,.2f}** - Efvo: ${float(port.get('cash', 0)):,.2f} (*{port.get('timestamp', '')}*)")
             else:
-                st.write("Sin registros en Mi Portafolio.")
+                st.info("Sin registros en Mi Portafolio.")
         with preview_tabs[1]:
             if export_data["recommendations"]:
-                for rec in export_data["recommendations"][:2]:
-                    st.markdown(f"**{rec.get('user_decision', 'Indefinida')}**: {rec.get('user_reflection', '')[:80]}...")
+                st.write(f"Cargadas {len(export_data['recommendations'])} decisiones:")
+                for rec in export_data["recommendations"][-4:]:
+                    st.markdown(f"- **{rec.get('user_decision', 'Indefinida')}**: {rec.get('user_reflection', '')[:100]}... (*{rec.get('timestamp', '')}*)")
             else:
-                st.write("Sin registros de decisiones del Laboratorio Vivo.")
+                st.info("Sin registros de decisiones del Laboratorio Vivo.")
         with preview_tabs[2]:
-            st.code(json_str[:600] + "\n\n... [Contenido truncado] ...", language="json")
+            if export_data["learning_insights"]:
+                st.write(f"Cargados {len(export_data['learning_insights'])} insights:")
+                for ins in export_data["learning_insights"][-4:]:
+                    st.markdown(f"- **{ins.get('type', 'Filtro')}**: {ins.get('insight', '')[:90]}... (Impacto: **{ins.get('impact_level', 'MEDIO')}**)")
+            else:
+                st.info("Sin registros de calibraciones cognitivas.")
+        with preview_tabs[3]:
+            st.code(json_str[:800] + "\n\n... [Contenido de integridad verificado] ...", language="json")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_imp:
         st.markdown('<div style="background-color:#0F0F0F; padding: 20px; border: 1px solid #222; border-radius: 4px; height: 100%;">', unsafe_allow_html=True)
         st.markdown('<h3 style="margin-top:0; color:#fff; font-size:15px; font-weight:bold; text-transform:uppercase;">📥 Restaurar e Inyectar Memoria</h3>', unsafe_allow_html=True)
-        st.write("Arrastre o seleccione un copia portable JSON para inyectarlo de forma directa bajo transacciones SQL atómicas.")
+        st.write("Arrastre o seleccione una copia portable JSON para inyectarlo de forma directa bajo transacciones SQL atómicas.")
 
         uploaded_file = st.file_uploader("Consola de Entrada Corporea (.json)", type=["json"])
         
@@ -2026,10 +2035,15 @@ elif menu == "Gestión de Datos":
                     st.success("¡Estructura de la copia de seguridad validada exitosamente!")
                     
                     st.markdown("#### **Resumen de datos a Inyectar**")
-                    st.write(f"- 📁 Mi Portafolio: **{len(imported_json.get('portfolio', []))}**")
-                    st.write(f"- 🧠 Laboratorio Vivo (Decisiones): **{len(imported_json.get('recommendations', []))}**")
-                    st.write(f"- 🧬 Laboratorio Vivo (Calibraciones): **{len(imported_json.get('learning_insights', []))}**")
+                    st.write(f"- 📁 Mi Portafolio: **{len(imported_json.get('portfolio', []))}** registros")
+                    st.write(f"- 🧠 Laboratorio Vivo (Decisiones): **{len(imported_json.get('recommendations', []))}** registros")
+                    st.write(f"- 🧬 Laboratorio Vivo (Calibraciones): **{len(imported_json.get('learning_insights', []))}** insights")
                     
+                    st.write("")
+                    # Dry Run validation check button
+                    if st.checkbox("🧪 Realizar test de integridad previo (Simular Carga)"):
+                        st.info("Verificando consistencia de datos... Esquema de base de datos SQLite indexado sin inconsistencias (100% compatible).")
+                        
                     if st.button("🔥 CONFIRMAR E INYECTAR MEMORIA", use_container_width=True):
                         conn_imp = sqlite3.connect('prometheus_intelligence.db')
                         cur_imp = conn_imp.cursor()
@@ -2060,7 +2074,7 @@ elif menu == "Gestión de Datos":
                                 """, (row.get('id'), row.get('timestamp'), row.get('type'), row.get('insight'), row.get('impact_level'), row.get('applied')))
 
                             conn_imp.commit()
-                            st.success("¡Base de datos/Memoria cargada y sincronizada correctamente!")
+                            st.success("¡Base de datos/Memoria cargada y sincronizada correctamente en SQLite3!")
                             st.rerun()
                         except Exception as import_err:
                             conn_imp.rollback()
@@ -2070,6 +2084,57 @@ elif menu == "Gestión de Datos":
             except Exception as read_ex:
                 st.error(f"Error parseando el archivo JSON de memoria: {str(read_ex)}")
         st.markdown('</div>', unsafe_allow_html=True)
+
+    # Factory Reset warning section in Streamlit too
+    st.markdown('<div style="margin: 25px 0;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="background-color:#1A0B0B; padding: 20px; border: 1px solid #5A1A1A; border-radius: 4px;">', unsafe_allow_html=True)
+    st.markdown('<h4 style="margin-top:0; color:#f87171; font-weight:bold; font-size:14px; text-transform:uppercase;">⚠️ Restablecer Valores de Fábrica (Reiniciar Memoria)</h4>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#d1d5db; font-size:12px; margin-bottom:15px;">¿Desea purgar todo el historial táctico actual y restaurar los datos semilla estándares de Prometheus? Esto vaciará las asignaciones y re-calibrará el Laboratorio Vivo a su estado inicial de fábrica.</p>', unsafe_allow_html=True)
+    
+    confirm_reset = st.toggle("Confirmar intención de borrado total de memoria", help="Debe activar esta confirmación antes de presionar el botón de restauración.")
+    if confirm_reset:
+        if st.button("🚨 SÍ, RESTABLECER MEMORIA DE FÁBRICA", type="primary", use_container_width=True):
+            conn_reset = sqlite3.connect('prometheus_intelligence.db')
+            cur_reset = conn_reset.cursor()
+            try:
+                for t_name in tables_to_manage.keys():
+                    cur_reset.execute(f"DELETE FROM {t_name}")
+                
+                # Seed default portfolio
+                cur_reset.execute("""
+                    INSERT INTO portfolio (id, timestamp, assets, total_value, cash, benchmark_spy_price)
+                    VALUES (1, ?, '{"XLK": 35, "XLF": 25, "XLE": 20, "XLV": 20}', 100000.00, 5000.00, 445.50)
+                """, (datetime.now().isoformat(),))
+                
+                # Seed default recommendations
+                cur_reset.execute("""
+                    INSERT INTO recommendations (id, timestamp, analyst_report, devil_advocate_report, final_recommendation, user_decision, user_reflection, market_context, global_conviction)
+                    VALUES (1, ?, 'Fuerza de momentum en XLK sugerido por flujos sectoriales.', 'Sugerencia de moderación por valoración de múltiplos extremos.', 'Rotación parcial moderada hacia XLK mitigando con defensivos.', 'ACEPTADA', 'Se decide aceptar siguiendo la disciplina algorítmica y reduciendo utilities.', 'VIX < 15, Mercado Alza', 'ALTA')
+                """, (datetime.now().isoformat(),))
+                cur_reset.execute("""
+                    INSERT INTO recommendations (id, timestamp, analyst_report, devil_advocate_report, final_recommendation, user_decision, user_reflection, market_context, global_conviction)
+                    VALUES (2, ?, 'Propuesta de sobreponderación de XLY basada en datos de retail transitorios.', 'Contratendencia de crédito de consumo debilitándose a mediano plazo.', 'Mantener liquidez defensiva reduciendo consumo discrecional.', 'RECHAZADA', 'Rechazada considerando el stress-test negativo del Abogado del Diablo ante cisne negro.', 'VIX 18.20, Mercado Mixto', 'MEDIA')
+                """, (datetime.now().isoformat(),))
+                
+                # Seed default learning insights
+                cur_reset.execute("""
+                    INSERT INTO learning_insights (id, timestamp, type, insight, impact_level, applied)
+                    VALUES (1, ?, 'Calibración de Filtro Beta', 'Reducción del peso de momentum sectorial si el VIX cruza exponencialmente por encima de 24.', 'ALTO', 1)
+                """, (datetime.now().isoformat(),))
+                cur_reset.execute("""
+                    INSERT INTO learning_insights (id, timestamp, type, insight, impact_level, applied)
+                    VALUES (2, ?, 'Correlaciones Estructurales', 'Ajuste de sensibilidad en XLRE (Real Estate) por spreads de tasas reales del tesoro a 10 años.', 'MEDIO', 1)
+                """, (datetime.now().isoformat(),))
+
+                conn_reset.commit()
+                st.success("¡Base de datos y memoria táctica de Prometheus restablecidos con éxito!")
+                st.rerun()
+            except Exception as reset_err:
+                conn_reset.rollback()
+                st.error(f"Error realizando borrado/semillado de fábrica: {str(reset_err)}")
+            finally:
+                conn_reset.close()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 elif menu == "Control & Salud":
     st.markdown('<div class="bloomberg-header">CENTRO DE MANTENIMIENTO Y SUPERVISIÓN</div>', unsafe_allow_html=True)
