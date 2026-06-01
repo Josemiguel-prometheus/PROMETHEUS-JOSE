@@ -558,7 +558,14 @@ elif menu == "💡 Señales 24H & Mejoras":
         st.dataframe(df_recs[["timestamp", "sector_lider", "score", "vix_at_generation", "action", "conviction"]], use_container_width=True)
 
 elif menu == "Pentágono de Agentes":
-    st.markdown('<div class="bloomberg-header">PENTÁGONO DE INTELIGENCIA COGNITIVA</div>', unsafe_allow_html=True)
+    col_hdr, col_ref = st.columns([3, 1])
+    with col_hdr:
+        st.markdown('<div class="bloomberg-header" style="margin-bottom: 0;">PENTÁGONO DE INTELIGENCIA COGNITIVA</div>', unsafe_allow_html=True)
+    with col_ref:
+        if st.button("🔄 RE-CALIBRAR AGENTES", use_container_width=True, help="Fuerza un re-cálculo y diálogo de los agentes cognitivos en tiempo real."):
+            st.toast("⚙️ Iniciando ciclos cognitivos de re-calibración...")
+            st.rerun()
+    st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
     
     with st.spinner("Analizando Correlaciones y Momentum Sectorial..."):
         data = get_global_data(list(SECTORES_GICS.keys()) + ["SPY", "^VIX"], st.session_state.safe_mode)

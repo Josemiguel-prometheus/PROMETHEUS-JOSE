@@ -33,7 +33,7 @@ const TABS = [
   { id: 'recommendations24h', label: '💡 Señales 24H & Mejoras', icon: Clock },
   { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
-  { id: 'agents', label: 'Agentes', icon: Users },
+  { id: 'agents', label: 'Pentágono de Agentes', icon: Users },
   { id: 'devil', label: '⚖️ Abogado del diablo', icon: Scale },
   { id: 'supervisor', label: 'Supervisor', icon: ShieldCheck },
   { id: 'history', label: 'Historial y Análisis', icon: History },
