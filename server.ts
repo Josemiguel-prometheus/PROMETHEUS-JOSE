@@ -218,6 +218,103 @@ async function startServer() {
     }
   });
 
+  app.get('/api/market/global-liquidity', async (req, res) => {
+    try {
+      const symbols = ['DX-Y.NYB', 'HYG', 'TLT', 'JPY=X', 'BTC-USD', 'GLD'];
+      const quotes = await getQuotes(symbols);
+
+      const dxyObj = quotes.find(q => q.symbol === 'DX-Y.NYB' || q.symbol === 'DXY');
+      const hygObj = quotes.find(q => q.symbol === 'HYG');
+      const tltObj = quotes.find(q => q.symbol === 'TLT');
+      const jpyObj = quotes.find(q => q.symbol === 'JPY=X');
+      const btcObj = quotes.find(q => q.symbol === 'BTC-USD');
+      const gldObj = quotes.find(q => q.symbol === 'GLD');
+
+      const dxyVal = dxyObj?.price || 102.2;
+      const hygVal = hygObj?.price || 78.5;
+      const tltVal = tltObj?.price || 91.0;
+      const jpyVal = jpyObj?.price || 156.4;
+      const btcVal = btcObj?.price || 67000;
+      const gldVal = gldObj?.price || 230;
+
+      // 1. DXY Score (Inverted: High dollar strength = dry liquidity, low dollar strength = abundant liquidity)
+      // Standard range 95.0 to 108.0
+      const dxyScore = Math.max(0, Math.min(100, Math.round(100 - ((dxyVal - 95) / 13) * 100)));
+
+      // 2. Credit Liquidity Score (HYG / TLT ratio - Corporate high yield vs safe Treasuries)
+      // Standard range: 0.70 to 1.05
+      const ratio = hygVal / tltVal;
+      const creditScore = Math.max(0, Math.min(100, Math.round(((ratio - 0.72) / 0.3) * 100)));
+
+      // 3. JPY Carry Trade Score (US JPY relative level - Weak Yen increases carrier funding expansion)
+      // Standard range: 130.0 to 165.0
+      const carryScore = Math.max(0, Math.min(100, Math.round(((jpyVal - 130) / 35) * 100)));
+
+      // 4. Speculative Flow (BTC vs GLD ROC 20-day)
+      let btcHist: any[] = [];
+      let gldHist: any[] = [];
+      try {
+        btcHist = await getHistoricalData('BTC-USD', 30);
+        gldHist = await getHistoricalData('GLD', 30);
+      } catch (err) {
+        console.warn('Error fetching speculative histories for liquidity:', err);
+      }
+
+      let speculativeScore = 55;
+      let btcRoc = 2.4;
+      let gldRoc = 0.8;
+      if (btcHist && btcHist.length > 15 && gldHist && gldHist.length > 15) {
+        const btcCurrent = btcHist[btcHist.length - 1].close;
+        const btcPrevious = btcHist[0].close;
+        const gldCurrent = gldHist[gldHist.length - 1].close;
+        const gldPrevious = gldHist[0].close;
+
+        btcRoc = calculateROC(btcCurrent, btcPrevious);
+        gldRoc = calculateROC(gldCurrent, gldPrevious);
+
+        // Map relative outperformance -8% to +8% onto 0..100
+        const diff = btcRoc - gldRoc;
+        speculativeScore = Math.max(0, Math.min(100, Math.round(((diff + 8) / 16) * 100)));
+      }
+
+      // Aggregate: 30% Currency, 25% Credit, 20% Carry JPY, 25% Speculative
+      const totalIndex = Math.round((dxyScore * 0.30) + (creditScore * 0.25) + (carryScore * 0.20) + (speculativeScore * 0.25));
+
+      let classification = 'Stable/Neutral';
+      if (totalIndex < 30) classification = 'Contraction';
+      else if (totalIndex < 46) classification = 'Tight';
+      else if (totalIndex <= 55) classification = 'Stable/Neutral';
+      else if (totalIndex <= 75) classification = 'Expansion';
+      else classification = 'Abundant';
+
+      res.json({
+        index: totalIndex,
+        classification,
+        components: {
+          currency: { dxyPrice: dxyVal, score: dxyScore },
+          credit: { ratio, hygPrice: hygVal, tltPrice: tltVal, score: creditScore },
+          carry: { jpyPrice: jpyVal, score: carryScore },
+          speculative: { btcRoc, gldRoc, tickerPrice: btcVal, score: speculativeScore }
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (e: any) {
+      console.error('Error generating global liquidity index:', e);
+      res.json({
+        index: 52,
+        classification: 'Stable/Neutral',
+        components: {
+          currency: { dxyPrice: 102.2, score: 45 },
+          credit: { ratio: 0.86, hygPrice: 78.5, tltPrice: 91.0, score: 47 },
+          carry: { jpyPrice: 156.4, score: 75 },
+          speculative: { btcRoc: 2.1, gldRoc: 1.1, score: 56 }
+        },
+        timestamp: new Date().toISOString(),
+        backup: true
+      });
+    }
+  });
+
   app.get('/api/analytics/rotations', async (req, res) => {
     try {
       const gicsTickers = ['XLE', 'XLB', 'XLI', 'XLY', 'XLP', 'XLV', 'XLF', 'XLK', 'XLC', 'XLU', 'XLRE'];

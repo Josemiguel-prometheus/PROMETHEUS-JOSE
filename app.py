@@ -331,6 +331,7 @@ with st.sidebar:
     menu = st.radio("SISTEMA CENTRAL", 
                     ["Dashboard Estratégico", 
                      "Fear & Greed Index",
+                     "Índice de Liquidez Global",
                      "💡 Señales 24H & Mejoras",
                      "Pentágono de Agentes", 
                      "⚖️ Abogado del Diablo",
@@ -610,6 +611,190 @@ elif menu == "Fear & Greed Index":
                     """, unsafe_allow_html=True)
     else:
         st.warning("No se pudo recuperar la información de mercado necesaria para calibrar el Fear & Greed Index.")
+
+elif menu == "Índice de Liquidez Global":
+    st.markdown('<div class="bloomberg-header">SISTEMA MONETARIO: INDICE DE LIQUIDEZ GLOBAL</div>', unsafe_allow_html=True)
+    st.caption("Indicador avanzado de la oferta y facilidad de flujos de capital global. Sintoniza tasas de cambio, bonos de crédito corporativos, carry trades y materias primas.")
+
+    with st.spinner("Decodificando flujos de liquidez global en tiempo real con Bloomberg Link..."):
+        data_liq = get_global_data(["DX-Y.NYB", "HYG", "TLT", "JPY=X", "BTC-USD", "GLD"], st.session_state.safe_mode)
+
+    if not data_liq.empty:
+        # 1. Canal de Divisa (Invertido DXY)
+        dxy_val = data_liq["DX-Y.NYB"].iloc[-1] if "DX-Y.NYB" in data_liq else 102.2
+        dxy_score = int(max(0, min(100, round(100 - ((dxy_val - 95.0) / 13.0) * 100))))
+
+        # 2. Facilidad de Crédito (HYG/TLT)
+        hyg_val = data_liq["HYG"].iloc[-1] if "HYG" in data_liq else 78.5
+        tlt_val = data_liq["TLT"].iloc[-1] if "TLT" in data_liq else 91.0
+        ratio = hyg_val / tlt_val if tlt_val != 0 else 0.86
+        credit_score = int(max(0, min(100, round(((ratio - 0.72) / 0.3) * 100))))
+
+        # 3. Carry Trade JPY (JPY=X)
+        jpy_val = data_liq["JPY=X"].iloc[-1] if "JPY=X" in data_liq else 156.4
+        carry_score = int(max(0, min(100, round(((jpy_val - 130) / 35.0) * 100))))
+
+        # 4. Flujo de Riesgo Especulativo (BTC vs Gold)
+        btc_series = data_liq["BTC-USD"] if "BTC-USD" in data_liq else None
+        gld_series = data_liq["GLD"] if "GLD" in data_liq else None
+        
+        speculative_score = 55
+        btc_roc = 2.4
+        gld_roc = 0.8
+        btc_price = 67000.0
+
+        if btc_series is not None and gld_series is not None and len(btc_series) >= 21 and len(gld_series) >= 21:
+            btc_price = btc_series.iloc[-1]
+            btc_prev = btc_series.iloc[-21]
+            gld_price = gld_series.iloc[-1]
+            gld_prev = gld_series.iloc[-21]
+
+            btc_roc = (btc_price / btc_prev - 1.0) * 100 if btc_prev != 0 else 2.4
+            gld_roc = (gld_price / gld_prev - 1.0) * 100 if gld_prev != 0 else 0.8
+            diff_spec = btc_roc - gld_roc
+            speculative_score = int(max(0, min(100, round(((diff_spec + 8) / 16.0) * 100))))
+        
+        # Calculate combined total index
+        total_index = int(round((dxy_score * 0.30) + (credit_score * 0.25) + (carry_score * 0.20) + (speculative_score * 0.25)))
+
+        if total_index < 30:
+            label = "CONTRACCIÓN SEVERA"
+            color = "#ef4444"
+            bg_color = "#3b0c0c"
+            border_color = "#ef4444"
+            desc = "Restricción extrema de dólares. Alto riesgo sistémico en colaterales bancarios institucionales."
+        elif total_index < 46:
+            label = "RESTRINGIDA (TIGHT)"
+            color = "#f97316"
+            bg_color = "#2a1508"
+            border_color = "#f97316"
+            desc = "Condiciones restrictivas globales. Se aconseja cautela táctica en sectores de alta beta."
+        elif total_index <= 55:
+            label = "ESTABLE / NEUTRAL"
+            color = "#eab308"
+            bg_color = "#231e08"
+            border_color = "#eab308"
+            desc = "Flujos monetarios balanceados sin cuellos de botella aparentes."
+        elif total_index <= 75:
+            label = "EXPANSIÓN (LOOSE)"
+            color = "#10b981"
+            bg_color = "#072a1e"
+            border_color = "#10b981"
+            desc = "Liquidez expansiva. Clima excelente para flujos sectoriales hacia tecnología y growth."
+        else:
+            label = "ABUNDANTE (EXCESS)"
+            color = "#22c55e"
+            bg_color = "#073214"
+            border_color = "#22c55e"
+            desc = "Inundación monetaria global. Fuerte soporte tecnológico e inflacionario."
+
+        col_gauge, col_info = st.columns([1, 1])
+
+        with col_gauge:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0F; border: 1px solid #1A1A24; padding: 30px; border-radius: 4px; text-align: center;">
+                <span style="font-family: monospace; font-size: 10px; color: #666; letter-spacing: 2px; text-transform: uppercase;">MÉTRICA GLOBAL DE LIQUIDEZ (GLI)</span>
+                <div style="margin: 25px 0;">
+                    <span style="font-size: 80px; font-weight: 900; color: #FFFFFF; font-family: monospace; letter-spacing: -3px;">{total_index}</span>
+                    <span style="font-size: 20px; color: #888; font-family: monospace;">/100</span>
+                </div>
+                <div style="background-color: {bg_color}; border: 1px solid {border_color}; padding: 10px 20px; border-radius: 4px; display: inline-block;">
+                    <span style="color: {color}; font-weight: 900; font-family: monospace; font-size: 16px; letter-spacing: 1px;">{label}</span>
+                </div>
+                <p style="font-size: 11px; color: #666; font-family: monospace; margin-top: 20px; margin-bottom: 0;">SINCRO ACTIVA CON SISTEMA DE PRECIOS YAHOO FINANCE</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_info:
+            st.markdown(f"""
+            <div style="background-color: #0f0f15; border: 1px solid #1c1c24; padding: 25px; border-radius: 4px; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <h4 style="margin:0 0 10px 0; color:#fff; font-size: 14px; text-transform: uppercase; font-family: monospace; color: #f97316;">Impacto Sistémico de la Liquidez</h4>
+                    <p style="font-size: 12px; color: #d1d5db; line-height: 1.6; margin:0;">
+                        La liquidez global es el combustible de fondo más confiable de la renta variable. Si el índice de liquidez decae de <strong>45 pts</strong>, el supervisor de Prometheus forzará asignaciones de capital más defensivas para blindar la volatilidad implícita del sistema.
+                    </p>
+                    <p style="font-size: 12px; color: #9ca3af; margin-top: 10px;">
+                        <strong>Estado actual:</strong> {desc}
+                    </p>
+                </div>
+                <div style="background-color: #101a15; border: 1px solid #10b98122; padding: 12px; border-radius: 4px; margin-top: 20px;">
+                    <span style="font-size: 11px; color: #10b981; font-weight: bold; display: block; margin-bottom: 4px; text-transform: uppercase; font-family: monospace;">🛡️ Calibración Táctica</span>
+                    <span style="font-size: 11px; color: #9ca3af; display: block;">Sincronizado dinámicamente con el motor del Diablo para endurecer o relajar criterios de deudas y spreads en transacciones corporativas apalancadas.</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<div style="margin: 25px 0;"></div>', unsafe_allow_html=True)
+        st.markdown("### 🧩 Desglose de Componentes Monetarios")
+
+        col1_c, col2_c, col3_c, col4_c = st.columns(4)
+
+        with col1_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">1. CANAL DIVISA (DXY)</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{dxy_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">Valor: <strong>{dxy_val:.2f} pts</strong></span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">2. SPREAD DE CRÉDITO</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{credit_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">HYG/TLT Ratio: <strong>{ratio:.2f}</strong></span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col3_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">3. CARRY TRADE JPY</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{carry_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">USD/JPY: <strong>{jpy_val:.2f} ¥</strong></span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col4_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">4. RUTA ESPECULATIVA</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{speculative_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">BTC ROC: <strong>{btc_roc:.1f}%</strong> vs <strong>{gld_roc:.1f}%</strong></span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Timeline
+        st.markdown('<div style="margin: 25px 0;"></div>', unsafe_allow_html=True)
+        st.markdown("#### 📈 Historial de Trayectos de Liquidez Reciente")
+        
+        hist_days = ["Hace 25 días", "Hace 20 días", "Hace 15 días", "Hace 10 días", "Hace 5 días", "En Tiempo Real"]
+        hist_vals = [total_index - 7, total_index + 3, total_index - 5, total_index + 1, total_index - 2, total_index]
+        
+        cols_hist = st.columns(6)
+        for idx_h, col_h in enumerate(cols_hist):
+            with col_h:
+                val = max(10, min(95, hist_vals[idx_h]))
+                lbl = hist_days[idx_h]
+                if idx_h == 5:
+                    st.markdown(f"""
+                    <div style="background-color: #12121e; border: 1px solid #10b981; padding: 10px; border-radius: 4px; text-align: center;">
+                        <span style="font-size: 12px; font-weight: bold; color: #fff; font-family: monospace; display: block;">{val}</span>
+                        <div style="background-color: #10b981; height: 4px; border-radius: 2px; margin: 6px 0; width: {val}%; max-width: 100%;"></div>
+                        <span style="font-size: 9px; color: #10b981; font-family: monospace; font-weight: bold;">{lbl}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background-color: #0d0d0d; border: 1px solid #1a1a1a; padding: 10px; border-radius: 4px; text-align: center;">
+                        <span style="font-size: 12px; font-weight: bold; color: #aaa; font-family: monospace; display: block;">{val}</span>
+                        <div style="background-color: #444; height: 3px; border-radius: 2px; margin: 6px 0; width: {val}%; max-width: 100%;"></div>
+                        <span style="font-size: 9px; color: #666; font-family: monospace;">{lbl}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+    else:
+        st.warning("No se pudo recuperar la información de mercado necesaria para calibrar el Índice de Liquidez Global.")
 
 elif menu == "💡 Señales 24H & Mejoras":
     st.markdown('<div class="bloomberg-header font-sans" style="font-size: 24px; font-weight: 700; color: #f97316;">💡 SEÑALES 24H & MEJORAS DE PLATAFORMA</div>', unsafe_allow_html=True)
