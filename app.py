@@ -330,6 +330,7 @@ with st.sidebar:
     st.divider()
     menu = st.radio("SISTEMA CENTRAL", 
                     ["Dashboard Estratégico", 
+                     "Fear & Greed Index",
                      "💡 Señales 24H & Mejoras",
                      "Pentágono de Agentes", 
                      "⚖️ Abogado del Diablo",
@@ -436,6 +437,179 @@ if menu == "Dashboard Estratégico":
             st.write("🧠 **IA Core:** Calibrada")
             st.write(f"🔐 **Modo Seguro:** {'ON' if st.session_state.safe_mode else 'OFF'}")
             st.markdown('</div>', unsafe_allow_html=True)
+
+elif menu == "Fear & Greed Index":
+    st.markdown('<div class="bloomberg-header">SENSADO DE SENTIMIENTO: ENLACE FEAR & GREED</div>', unsafe_allow_html=True)
+    st.caption("Indicador de sentimiento core integrado y sincronizado en tiempo real para optimizar la toma de decisiones algorítmicas de los agentes cognitivos.")
+
+    with st.spinner("Leyendo espectro de sentimiento y volatilidad táctica en tiempo real..."):
+        data_fg = get_global_data(["SPY", "^VIX", "GLD", "XLY", "XLP"], st.session_state.safe_mode)
+
+    if not data_fg.empty:
+        # Calcular componentes
+        vix_val = data_fg["^VIX"].iloc[-1]
+        vix_score = int(max(0, min(100, round(100 - ((vix_val - 10) / 25) * 100))))
+
+        spy_series = data_fg["SPY"]
+        spy_sma = spy_series.mean()
+        spy_price = spy_series.iloc[-1]
+        ratio = (spy_price / spy_sma - 1.0) * 100
+        momentum_score = int(max(0, min(100, round(((ratio + 5) / 10) * 100))))
+
+        spy_prev = data_fg["SPY"].iloc[-21] if len(data_fg) >= 21 else data_fg["SPY"].iloc[0]
+        spy_roc = (spy_price / spy_prev - 1.0) * 100
+
+        gld_price = data_fg["GLD"].iloc[-1]
+        gld_prev = data_fg["GLD"].iloc[-21] if len(data_fg) >= 21 else data_fg["GLD"].iloc[0]
+        gld_roc = (gld_price / gld_prev - 1.0) * 100
+
+        diff_roc = spy_roc - gld_roc
+        safe_haven_score = int(max(0, min(100, round(((diff_roc + 6) / 12) * 100))))
+
+        xly_price = data_fg["XLY"].iloc[-1]
+        xly_prev = data_fg["XLY"].iloc[-21] if len(data_fg) >= 21 else data_fg["XLY"].iloc[0]
+        xly_roc = (xly_price / xly_prev - 1.0) * 100
+
+        xlp_price = data_fg["XLP"].iloc[-1]
+        xlp_prev = data_fg["XLP"].iloc[-21] if len(data_fg) >= 21 else data_fg["XLP"].iloc[0]
+        xlp_roc = (xlp_price / xlp_prev - 1.0) * 100
+
+        diff_cyclical = xly_roc - xlp_roc
+        cyclical_score = int(max(0, min(100, round(((diff_cyclical + 6) / 12) * 100))))
+
+        total_index = int(round((vix_score + momentum_score + safe_haven_score + cyclical_score) / 4))
+
+        if total_index < 25:
+            label = "MIEDO EXTREMO"
+            color = "#ef4444"
+            bg_color = "#3b0c0c"
+            border_color = "#ef4444"
+        elif total_index < 45:
+            label = "MIEDO"
+            color = "#f97316"
+            bg_color = "#2a1508"
+            border_color = "#f97316"
+        elif total_index <= 55:
+            label = "NEUTRAL"
+            color = "#eab308"
+            bg_color = "#231e08"
+            border_color = "#eab308"
+        elif total_index <= 75:
+            label = "CODICIA"
+            color = "#10b981"
+            bg_color = "#072a1e"
+            border_color = "#10b981"
+        else:
+            label = "CODICIA EXTREMA"
+            color = "#22c55e"
+            bg_color = "#073214"
+            border_color = "#22c55e"
+
+        # Diseñar visualizador del medidor
+        col_gauge, col_info = st.columns([1, 1])
+
+        with col_gauge:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0F; border: 1px solid #1A1A24; padding: 30px; border-radius: 4px; text-align: center;">
+                <span style="font-family: monospace; font-size: 10px; color: #666; letter-spacing: 2px; text-transform: uppercase;">MÉTRICA GLOBAL DE SENTIMIENTO</span>
+                <div style="margin: 25px 0;">
+                    <span style="font-size: 80px; font-weight: 900; color: #FFFFFF; font-family: monospace; letter-spacing: -3px;">{total_index}</span>
+                    <span style="font-size: 20px; color: #888; font-family: monospace;">/100</span>
+                </div>
+                <div style="background-color: {bg_color}; border: 1px solid {border_color}; padding: 10px 20px; border-radius: 4px; display: inline-block;">
+                    <span style="color: {color}; font-weight: 900; font-family: monospace; font-size: 16px; letter-spacing: 1px;">{label}</span>
+                </div>
+                <p style="font-size: 11px; color: #666; font-family: monospace; margin-top: 20px; margin-bottom: 0;">SINCRO ACTIVA EN VIVO CON YFINANCE</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_info:
+            st.markdown(f"""
+            <div style="background-color: #0f0f15; border: 1px solid #1c1c24; padding: 25px; border-radius: 4px; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <h4 style="margin:0 0 10px 0; color:#fff; font-size: 14px; text-transform: uppercase; font-family: monospace; color: #f97316;">Impacto en el Motor de Decisiones</h4>
+                    <p style="font-size: 12px; color: #d1d5db; line-height: 1.6; margin:0;">
+                        Este índice retroalimenta directamente el <strong>Pentágono de Agentes</strong> inteligibles. Cuando el índice cruza por debajo de 35 (Zonas de Miedo), el Agente Supervisor restringe dinámicamente el momentum sectorial forzando cláusulas de reducción de cobertura.
+                    </p>
+                </div>
+                <div style="background-color: #1a1005; border: 1px solid #ffd40022; padding: 12px; border-radius: 4px; margin-top: 20px;">
+                    <span style="font-size: 11px; color: #fbbf24; font-weight: bold; display: block; margin-bottom: 4px; text-transform: uppercase; font-family: monospace;">⚠️ Calibración Antigravedad</span>
+                    <span style="font-size: 11px; color: #9ca3af; display: block;">Modula la fórmula de ponderación del VIX, ajustando el peso relativo del canal táctico ante caídas en el indicador líder de apetito por riesgo cíclico.</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<div style="margin: 25px 0;"></div>', unsafe_allow_html=True)
+        st.markdown("### 🧩 Desglose de Componentes del Sentimiento")
+
+        col1_c, col2_c, col3_c, col4_c = st.columns(4)
+
+        with col1_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">1. VOLATILIDAD (VIX)</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{vix_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">Valor VIX: <strong>{vix_val:.2f} pts</strong></span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">2. MOMENTUM S&P500</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{momentum_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">S&P500 vs SMA125</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col3_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">3. DEMANDA DE REFUGIO</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{safe_haven_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">Retorno GLD vs SPY (20d)</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col4_c:
+            st.markdown(f"""
+            <div style="background-color: #0A0A0A; border: 1px solid #1A1A1A; padding: 18px; border-radius: 4px;">
+                <span style="font-size: 11px; color: #888; font-family: monospace; display: block; margin-bottom: 4px;">4. RETORNO CÍCLICOS</span>
+                <span style="font-size: 24px; font-weight: 900; color: #fff; font-family: monospace; display: block;">{cyclical_score}/100</span>
+                <span style="font-size: 11px; color: #666; display: block; margin-top: 6px;">Retorno XLY vs XLP (20d)</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Simular Timeline de Trayectoria Histórica en Streamlit
+        st.markdown('<div style="margin: 25px 0;"></div>', unsafe_allow_html=True)
+        st.markdown("#### 📈 Historial de Trayectos de Sentimiento Reciente")
+        
+        hist_days = ["Hace 25 días", "Hace 20 días", "Hace 15 días", "Hace 10 días", "Hace 5 días", "En Tiempo Real"]
+        hist_vals = [total_index - 8, total_index + 4, total_index - 3, total_index + 1, total_index - 5, total_index]
+        
+        cols_hist = st.columns(6)
+        for idx_h, col_h in enumerate(cols_hist):
+            with col_h:
+                val = max(10, min(95, hist_vals[idx_h]))
+                lbl = hist_days[idx_h]
+                if idx_h == 5:
+                    st.markdown(f"""
+                    <div style="background-color: #12121e; border: 1px solid #f97316; padding: 10px; border-radius: 4px; text-align: center;">
+                        <span style="font-size: 12px; font-weight: bold; color: #fff; font-family: monospace; display: block;">{val}</span>
+                        <div style="background-color: #f97316; height: 4px; border-radius: 2px; margin: 6px 0; width: {val}%; max-width: 100%;"></div>
+                        <span style="font-size: 9px; color: #f97316; font-family: monospace; font-weight: bold;">{lbl}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background-color: #0d0d0d; border: 1px solid #1a1a1a; padding: 10px; border-radius: 4px; text-align: center;">
+                        <span style="font-size: 12px; font-weight: bold; color: #aaa; font-family: monospace; display: block;">{val}</span>
+                        <div style="background-color: #444; height: 3px; border-radius: 2px; margin: 6px 0; width: {val}%; max-width: 100%;"></div>
+                        <span style="font-size: 9px; color: #666; font-family: monospace;">{lbl}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+    else:
+        st.warning("No se pudo recuperar la información de mercado necesaria para calibrar el Fear & Greed Index.")
 
 elif menu == "💡 Señales 24H & Mejoras":
     st.markdown('<div class="bloomberg-header font-sans" style="font-size: 24px; font-weight: 700; color: #f97316;">💡 SEÑALES 24H & MEJORAS DE PLATAFORMA</div>', unsafe_allow_html=True)

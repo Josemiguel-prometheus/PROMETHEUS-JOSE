@@ -27,9 +27,11 @@ import ConfigPanel from './components/ConfigPanel';
 import DevilAdvocatePanel from './components/DevilAdvocatePanel';
 import Recommendations24hPanel from './components/Recommendations24hPanel';
 import DataManagementPanel from './components/DataManagementPanel';
+import FearGreedPanel from './components/FearGreedPanel';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
+  { id: 'fear_greed', label: 'Fear & Greed Index', icon: AlertTriangle },
   { id: 'recommendations24h', label: '💡 Señales 24H & Mejoras', icon: Clock },
   { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
@@ -138,6 +140,7 @@ export default function App() {
               className="p-8 max-w-7xl mx-auto"
             >
               {activeTab === 'dashboard' && <Dashboard />}
+              {activeTab === 'fear_greed' && <FearGreedPanel />}
               {activeTab === 'recommendations24h' && <Recommendations24hPanel />}
               {activeTab === 'rotations' && <RotationsPanel />}
               {activeTab === 'quotes' && <RealTimeQuotes />}
