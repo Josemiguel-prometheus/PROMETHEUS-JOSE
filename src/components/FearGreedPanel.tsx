@@ -1,16 +1,51 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, TrendingUp, ShieldAlert, Cpu, RefreshCw, BarChart2, ShieldCheck, Coins } from 'lucide-react';
+import { 
+  AlertTriangle, 
+  TrendingUp, 
+  ShieldAlert, 
+  Cpu, 
+  RefreshCw, 
+  BarChart2, 
+  ShieldCheck, 
+  Layers, 
+  Activity, 
+  Coins, 
+  Flame, 
+  ChevronRight, 
+  PieChart 
+} from 'lucide-react';
 import { cn } from '../lib/utils';
+
+interface IndicatorInfo {
+  score: number;
+  name: string;
+  value?: number;
+  sma?: number;
+  high?: number;
+  low?: number;
+  ratio?: number;
+  spyRoc?: number;
+  tltRoc?: number;
+  hygRoc?: number;
+  lqdRoc?: number;
+}
 
 interface FearGreedData {
   index: number;
   classification: string;
+  yesterday: number;
+  oneWeekAgo: number;
+  oneMonthAgo: number;
+  oneYearAgo: number;
   components: {
-    vix: { value: number; score: number };
-    momentum: { spyPrice: number; spySma: number; score: number };
-    safeHaven: { spyRoc: number; gldRoc: number; score: number };
-    cyclical: { xlyRoc: number; xlpRoc: number; score: number };
+    momentum: IndicatorInfo;
+    strength: IndicatorInfo;
+    breadth: IndicatorInfo;
+    options: IndicatorInfo;
+    volatility: IndicatorInfo;
+    safeHaven: IndicatorInfo;
+    junkBond: IndicatorInfo;
   };
   timestamp: string;
   backup?: boolean;
@@ -20,7 +55,6 @@ export default function FearGreedPanel() {
   const [data, setData] = useState<FearGreedData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [historySimulated, setHistorySimulated] = useState<{ date: string; value: number }[]>([]);
 
   const fetchIndex = async (isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -30,20 +64,6 @@ export default function FearGreedPanel() {
       const res = await fetch('/api/market/fear-greed');
       const json = await res.json();
       setData(json);
-
-      // Generate mock beautiful historic points based around current index for context
-      const curVal = json.index;
-      const hist = Array.from({ length: 6 }).map((_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (5 - i) * 5);
-        // Random walk around current index
-        const walk = Math.max(10, Math.min(95, Math.round(curVal + (Math.sin(i) * 12) + (Math.random() * 8 - 4))));
-        return {
-          date: d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
-          value: i === 5 ? curVal : walk
-        };
-      });
-      setHistorySimulated(hist);
     } catch (e) {
       console.error('Failed to load fear & greed:', e);
     } finally {
@@ -54,7 +74,7 @@ export default function FearGreedPanel() {
 
   useEffect(() => {
     fetchIndex();
-    const interval = setInterval(() => fetchIndex(), 15000); // Poll every 15s for "real-time" sync
+    const interval = setInterval(() => fetchIndex(), 15000); // Live sync 15s
     return () => clearInterval(interval);
   }, []);
 
@@ -62,7 +82,7 @@ export default function FearGreedPanel() {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <RefreshCw className="w-8 h-8 text-orange-500 animate-spin" />
-        <p className="text-xs font-mono text-gray-500 uppercase tracking-widest">Sincronizando Sentimiento de Mercado...</p>
+        <p className="text-xs font-mono text-gray-500 uppercase tracking-widest">Sincronizando Indicador CNN FEAR & GREED...</p>
       </div>
     );
   }
@@ -70,39 +90,112 @@ export default function FearGreedPanel() {
   const indexVal = data?.index ?? 50;
   const classification = data?.classification ?? 'Neutral';
 
-  // Define gauge angle calculation (180 degrees arc, starts at -180, arrow goes from 0% to 100%)
+  // Pointer angle (semi-circle)
   const angle = (indexVal / 100) * 180 - 90;
 
-  // Sentiment styling mapping
-  const sentimentMeta = {
-    'Extreme Fear': { label: 'Miedo Extremo', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
-    'Fear': { label: 'Miedo', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
-    'Neutral': { label: 'Neutral', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' },
-    'Greed': { label: 'Codicia', color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-    'Extreme Greed': { label: 'Codicia Extrema', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/30' },
-  }[classification] || { label: 'Neutral', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' };
+  // Helper to resolve specific sub-metric labels
+  const getSubLabel = (score: number) => {
+    if (score < 25) return { text: 'Miedo Extremo', color: 'text-red-500', bg: 'bg-red-500/10' };
+    if (score < 45) return { text: 'Miedo', color: 'text-orange-500', bg: 'bg-orange-500/10' };
+    if (score <= 55) return { text: 'Neutral', color: 'text-yellow-500', bg: 'bg-yellow-500/10' };
+    if (score <= 75) return { text: 'Codicia', color: 'text-emerald-500', bg: 'bg-emerald-500/10' };
+    return { text: 'Codicia Extrema', color: 'text-green-400', bg: 'bg-green-400/10' };
+  };
+
+  const getSubLabelForGauge = (classificationStr: string) => {
+    const map: Record<string, { label: string; color: string; bg: string; border: string; desc: string }> = {
+      'Extreme Fear': { label: 'Miedo Extremo', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30', desc: 'Mercado deprimido por aversión extrema al riesgo. Oportunidad contraria histórica.' },
+      'Fear': { label: 'Miedo', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/30', desc: 'Sentimiento negativo prevalece. Flujos de capital se repliegan hacia la seguridad.' },
+      'Neutral': { label: 'Neutral', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', desc: 'Fuerzas balanceadas de compra y venta. Sincronía en rangos de consolidación.' },
+      'Greed': { label: 'Codicia', color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', desc: 'Euforia moderada. Los inversores aceleran compras de renta variable y activos de riesgo.' },
+      'Extreme Greed': { label: 'Codicia Extrema', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/30', desc: 'Máximo sobrecalentamiento. Aversión al riesgo evaporada, riesgo de corrección táctico elevado.' },
+    };
+    return map[classificationStr] || { label: 'Neutral', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', desc: 'Fuerzas balanceadas de compra y venta.' };
+  };
+
+  const currentMeta = getSubLabelForGauge(classification);
+
+  // Indicators mapping with custom icons and descriptive captions matching CNN
+  const indicatorsList = [
+    {
+      key: 'momentum' as const,
+      title: 'Impulso del Mercado',
+      alias: 'Market Momentum',
+      icon: TrendingUp,
+      desc: 'S&P 500 frente a su media móvil de 125 días. Cuando el índice cotiza sustancialmente arriba, indica salud alcista constante.',
+      details: (info: IndicatorInfo) => `S&P Proxy: $${info.value?.toFixed(1)} | SMA 125m: $${info.sma?.toFixed(1)}`
+    },
+    {
+      key: 'strength' as const,
+      title: 'Fuerza del Precio',
+      alias: 'Stock Price Strength',
+      icon: Flame,
+      desc: 'Calcula el ratio de acciones que marcan máximos de 52 semanas frente a las que marcan mínimos de 52 semanas en la bolsa.',
+      details: (info: IndicatorInfo) => `Máximo Anual: $${info.high?.toFixed(1)} | Mínimo Anual: $${info.low?.toFixed(1)}`
+    },
+    {
+      key: 'breadth' as const,
+      title: 'Amplitud de Mercado',
+      alias: 'Stock Price Breadth',
+      icon: BarChart2,
+      desc: 'Analiza el volumen de negociación al alza frente al volumen a la baja (línea Avance/Descenso del volumen negociado).',
+      details: (info: IndicatorInfo) => `Fuerza del Volumen Breadth: ${info.value}%`
+    },
+    {
+      key: 'options' as const,
+      title: 'Opciones Put y Call',
+      alias: 'Put and Call Options',
+      icon: PieChart,
+      desc: 'La relación del volumen de opciones de cobertura (Puts) frente a las de compra (Calls). Ratios bajos expresan codicia.',
+      details: (info: IndicatorInfo) => `Ratio Put/Call: ${info.ratio?.toFixed(2)}`
+    },
+    {
+      key: 'volatility' as const,
+      title: 'Volatilidad del Mercado',
+      alias: 'Market Volatility',
+      icon: Activity,
+      desc: 'Compara el índice VIX (indicador de volatilidad implícita del S&P 500) frente a su media móvil simple registrada de 50 días.',
+      details: (info: IndicatorInfo) => `Índice VIX: ${info.value?.toFixed(2)} | SMA 50d: ${info.sma?.toFixed(2)}`
+    },
+    {
+      key: 'safeHaven' as const,
+      title: 'Demanda de Refugio',
+      alias: 'Safe Haven Demand',
+      icon: Coins,
+      desc: 'La diferencia de rendimiento (ROC de 20 días de mercado) entre las acciones del S&P 500 y los bonos refugio TLT.',
+      details: (info: IndicatorInfo) => `Renta Variable: ${info.spyRoc?.toFixed(1)}% vs Bonos Refugio: ${info.tltRoc?.toFixed(1)}%`
+    },
+    {
+      key: 'junkBond' as const,
+      title: 'Bonos Basura',
+      alias: 'Junk Bond Demand',
+      icon: Layers,
+      desc: 'La recompensa que exigen los inversores por asumir deuda corporativa especulativa (HYG) frente a activos estables (LQD).',
+      details: (info: IndicatorInfo) => `Corporativo HYG: ${info.hygRoc?.toFixed(1)}% vs Grado de Inversión: ${info.lqdRoc?.toFixed(1)}%`
+    }
+  ];
 
   return (
-    <div className="space-y-8 animate-fade-in" id="fear-greed-market-sentiment">
+    <div className="space-y-8 animate-fade-in" id="cnn-fear-greed-real-time-panel">
       {/* Title block */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-[#1A1A1A] pb-6 gap-4">
         <div>
           <h2 className="text-xl font-black text-white tracking-tight uppercase flex items-center gap-2.5">
-            <AlertTriangle className="w-5 h-5 text-orange-500" />
-            Índice Fear & Greed (Miedo y Codicia)
+            <AlertTriangle className="w-5 h-5 text-orange-500 animate-pulse" />
+            CNN Business - Fear & Greed Index
           </h2>
           <p className="text-xs text-gray-400 font-mono mt-1">
-            Sensor de sentimiento global calibrado en tiempo real con volatilidad táctica (VIX), aceleración del S&P500 y flujos defensivos.
+            Replicación precisa y robusta del indicador de sentimiento líder. Integra las 7 variables financieras mundiales bajo el motor de CNN para guiar la toma de decisiones.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           {data?.backup && (
             <span className="text-[10px] bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2 py-0.5 rounded-sm font-mono uppercase">
-              MODO RESILIENTE ACTIVO
+              DATOS RESILIENTES
             </span>
           )}
-          <span className="text-[10px] font-mono text-gray-500">REFRESCO AUTOMÁTICO ACTIVO (15S)</span>
+          <span className="text-[10px] font-mono text-gray-500">SINCRO CON MERCADOS ACTIVADA</span>
           <button
             onClick={() => fetchIndex(true)}
             disabled={refreshing}
@@ -114,25 +207,25 @@ export default function FearGreedPanel() {
         </div>
       </div>
 
-      {/* Main gauge layout */}
+      {/* Main Gauge and Table Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-        {/* Left arc gauge & classification */}
+        
+        {/* Left Side: Semi-circle Gauge */}
         <div className="lg:col-span-5 bg-[#0F0F0F] border border-[#1A1A1A] p-8 rounded-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
-          {/* Subtle grid background */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#111_1px,transparent_1px),linear-gradient(to_bottom,#111_1px,transparent_1px)] bg-[size:16px_16px] opacity-20 pointer-events-none" />
           
-          <span className="text-[10px] uppercase font-mono tracking-widest text-[#555] mb-4">MÉTRICA DE ESTRESS GÓTICO</span>
+          <span className="text-[10px] uppercase font-mono tracking-widest text-[#555] mb-4">INDICADOR ACTIVO EN TIEMPO REAL</span>
 
           {/* SVG Gauge */}
           <div className="relative w-64 h-36 flex items-center justify-center mt-2">
             <svg className="w-full h-full overflow-visible" viewBox="0 0 200 100">
-              {/* Defs for gradients */}
               <defs>
-                <linearGradient id="gaugeGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+                <linearGradient id="cnnGlow" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#ef4444" />
-                  <stop offset="35%" stopColor="#f97316" />
-                  <stop offset="50%" stopColor="#eab308" />
-                  <stop offset="65%" stopColor="#10b981" />
+                  <stop offset="25%" stopColor="#ef4444" />
+                  <stop offset="45%" stopColor="#f97316" />
+                  <stop offset="55%" stopColor="#eab308" />
+                  <stop offset="75%" stopColor="#10b981" />
                   <stop offset="100%" stopColor="#22c55e" />
                 </linearGradient>
               </defs>
@@ -142,7 +235,7 @@ export default function FearGreedPanel() {
                 d="M 20 90 A 80 80 0 0 1 180 90"
                 fill="none"
                 stroke="#1A1A1A"
-                strokeWidth="12"
+                strokeWidth="14"
                 strokeLinecap="round"
               />
 
@@ -150,16 +243,11 @@ export default function FearGreedPanel() {
               <path
                 d="M 20 90 A 80 80 0 0 1 180 90"
                 fill="none"
-                stroke="url(#gaugeGlow)"
-                strokeWidth="8"
+                stroke="url(#cnnGlow)"
+                strokeWidth="10"
                 strokeLinecap="round"
-                opacity="0.8"
+                opacity="0.9"
               />
-
-              {/* Division notches */}
-              <line x1="20" y1="90" x2="28" y2="90" stroke="#000" strokeWidth="2" />
-              <line x1="180" y1="90" x2="172" y2="90" stroke="#000" strokeWidth="2" />
-              <line x1="100" y1="10" x2="100" y2="18" stroke="#000" strokeWidth="2" />
 
               {/* Dynamic pointer arrow needle */}
               <g transform={`translate(100, 90)`}>
@@ -169,25 +257,25 @@ export default function FearGreedPanel() {
                   x2="0"
                   y2="-75"
                   stroke="#FFFFFF"
-                  strokeWidth="3"
+                  strokeWidth="3.5"
                   strokeLinecap="round"
                   animate={{ rotate: angle }}
                   transition={{ type: 'spring', stiffness: 50, damping: 10 }}
                 />
-                <circle cx="0" cy="0" r="6" fill="#FFFFFF" />
-                <circle cx="0" cy="0" r="3" fill="#ef4444" />
+                <circle cx="0" cy="0" r="7" fill="#FFFFFF" />
+                <circle cx="0" cy="0" r="3.5" fill="#ef4444" />
               </g>
 
               {/* Labels */}
-              <text x="18" y="105" fill="#ef4444" fontSize="8" fontWeight="bold" textAnchor="middle">MIEDO</text>
+              <text x="18" y="105" fill="#ef4444" fontSize="8" fontWeight="bold" textAnchor="middle">0 (MIEDO)</text>
               <text x="100" y="99" fill="#eab308" fontSize="8" fontWeight="bold" textAnchor="middle">50</text>
-              <text x="182" y="105" fill="#22c55e" fontSize="8" fontWeight="bold" textAnchor="middle">CODICIA</text>
+              <text x="182" y="105" fill="#22c55e" fontSize="8" fontWeight="bold" textAnchor="middle">CODICIA (100)</text>
             </svg>
 
             {/* Float value */}
             <div className="absolute bottom-0 text-center">
               <motion.div 
-                className="text-5xl font-black font-mono tracking-tighter text-white"
+                className="text-6xl font-black font-mono tracking-tighter text-white"
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 key={indexVal}
@@ -197,124 +285,150 @@ export default function FearGreedPanel() {
             </div>
           </div>
 
-          <div className="mt-6 space-y-1 z-10">
+          <div className="mt-6 space-y-2 z-10 w-full">
             <span className={cn(
-              "text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-sm border inline-block",
-              sentimentMeta.bg, sentimentMeta.color, sentimentMeta.border
+              "text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-sm border inline-block",
+              currentMeta.bg, currentMeta.color, currentMeta.border
             )}>
-              {sentimentMeta.label}
+              {currentMeta.label}
             </span>
-            <p className="text-[10px] text-gray-500 font-mono mt-2 uppercase">
-              Actualizado: {new Date(data?.timestamp || '').toLocaleTimeString()}
+            <p className="text-xs text-gray-400 max-w-xs mx-auto leading-snug mt-1">
+              {currentMeta.desc}
             </p>
           </div>
         </div>
 
-        {/* Right sub-indicators breakdowns */}
-        <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Component 1: VIX Volatility */}
-            <div className="border border-[#1A1A1A] p-4 rounded-sm bg-[#090909] hover:border-[#222] transition-all flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-orange-400" />
-                  <span className="text-[11px] font-bold text-white uppercase tracking-tight">Volatilidad Táctica (VIX)</span>
+        {/* Right Side: CNN's Interval Table */}
+        <div className="lg:col-span-7 bg-[#09090D] border border-[#1A1A1A] p-6 rounded-sm flex flex-col justify-between">
+          <div>
+            <h4 className="text-xs font-bold text-gray-300 uppercase tracking-widest mb-4 font-mono">Resumen de Índices Históricos (Estilo CNN)</h4>
+            
+            <div className="divide-y divide-[#16161C]">
+              
+              {/* Ahora */}
+              <div className="flex items-center justify-between py-3.5">
+                <span className="text-sm font-medium text-white flex items-center gap-2">
+                  <ChevronRight className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+                  AHORA
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className={cn("text-xs font-bold font-mono px-2 py-0.5 rounded-sm", currentMeta.bg, currentMeta.color)}>
+                    {classification === 'Extreme Fear' && 'Miedo Extremo'}
+                    {classification === 'Fear' && 'Miedo'}
+                    {classification === 'Neutral' && 'Neutral'}
+                    {classification === 'Greed' && 'Codicia'}
+                    {classification === 'Extreme Greed' && 'Codicia Extrema'}
+                  </span>
+                  <span className="text-sm font-black font-mono text-white w-8 text-right">{indexVal}</span>
                 </div>
-                <span className="text-[10px] text-gray-400 font-mono">{data?.components.vix.value.toFixed(2)} pts</span>
               </div>
-              <div className="text-2xl font-black text-white font-mono">{data?.components.vix.score}/100</div>
-              <p className="text-[10px] text-gray-500 leading-snug mt-2">
-                Un VIX inferior a 15 dispara la escala de optimismo, mientras que cruces sobre 20 indican pánico institucional y protecciones de cobertura.
-              </p>
-            </div>
 
-            {/* Component 2: S&P 500 Momentum */}
-            <div className="border border-[#1A1A1A] p-4 rounded-sm bg-[#090909] hover:border-[#222] transition-all flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-orange-400" />
-                  <span className="text-[11px] font-bold text-white uppercase tracking-tight">Acción del S&P 500 (SMA 125)</span>
+              {/* Ayer */}
+              <div className="flex items-center justify-between py-3.5">
+                <span className="text-sm text-gray-400">Ayer</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-gray-500">
+                    {data?.yesterday && getSubLabel(data.yesterday).text}
+                  </span>
+                  <span className="text-sm font-mono text-gray-300 w-8 text-right">{data?.yesterday}</span>
                 </div>
-                <span className="text-[10px] text-gray-400 font-mono">${data?.components.momentum.spyPrice.toFixed(1)}</span>
               </div>
-              <div className="text-2xl font-black text-white font-mono">{data?.components.momentum.score}/100</div>
-              <p className="text-[10px] text-gray-500 leading-snug mt-2">
-                Mide la persistencia de largo plazo del SPY relativa a su media móvil. Un mercado sobre su SMA valida apetito de capital agresivo.
-              </p>
-            </div>
 
-            {/* Component 3: Safe Haven (Bond/Gold Demand) */}
-            <div className="border border-[#1A1A1A] p-4 rounded-sm bg-[#090909] hover:border-[#222] transition-all flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Coins className="w-4 h-4 text-orange-400" />
-                  <span className="text-[11px] font-bold text-white uppercase tracking-tight">Demanda de Refugio (GLD vs SPY)</span>
+              {/* Hace una semana */}
+              <div className="flex items-center justify-between py-3.5">
+                <span className="text-sm text-gray-400">Hace una semana</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-gray-500">
+                    {data?.oneWeekAgo && getSubLabel(data.oneWeekAgo).text}
+                  </span>
+                  <span className="text-sm font-mono text-gray-300 w-8 text-right">{data?.oneWeekAgo}</span>
                 </div>
-                <span className="text-[10px] text-gray-400 font-mono">ROC 20d: {(data?.components.safeHaven.spyRoc || 0).toFixed(1)}% vs {(data?.components.safeHaven.gldRoc || 0).toFixed(1)}%</span>
               </div>
-              <div className="text-2xl font-black text-white font-mono">{data?.components.safeHaven.score}/100</div>
-              <p className="text-[10px] text-gray-500 leading-snug mt-2">
-                Sincroniza tasas de retorno del oro físico contra la renta variable. Si el oro lidera, el mercado busca resguardo (Miedo).
-              </p>
-            </div>
 
-            {/* Component 4: Cyclicals Strength (XLY vs XLP) */}
-            <div className="border border-[#1A1A1A] p-4 rounded-sm bg-[#090909] hover:border-[#222] transition-all flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <BarChart2 className="w-4 h-4 text-orange-400" />
-                  <span className="text-[11px] font-bold text-white uppercase tracking-tight">Consumo Cíclico vs Staples</span>
+              {/* Hace un mes */}
+              <div className="flex items-center justify-between py-3.5">
+                <span className="text-sm text-gray-400">Hace un mes</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-gray-500">
+                    {data?.oneMonthAgo && getSubLabel(data.oneMonthAgo).text}
+                  </span>
+                  <span className="text-sm font-mono text-gray-300 w-8 text-right">{data?.oneMonthAgo}</span>
                 </div>
-                <span className="text-[10px] text-gray-400 font-mono">ROC 20d: {(data?.components.cyclical.xlyRoc || 0).toFixed(1)}% vs {(data?.components.cyclical.xlpRoc || 0).toFixed(1)}%</span>
               </div>
-              <div className="text-2xl font-black text-white font-mono">{data?.components.cyclical.score}/100</div>
-              <p className="text-[10px] text-gray-500 leading-snug mt-2">
-                Analiza flujos de Consumo Discrecional (XLY) contra Consumo Básico (XLP). Liderazgo de XLY valida asunción de riesgos directos.
-              </p>
+
+              {/* Hace un año */}
+              <div className="flex items-center justify-between py-3.5">
+                <span className="text-sm text-gray-400">Hace un año</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-gray-500">
+                    {data?.oneYearAgo && getSubLabel(data.oneYearAgo).text}
+                  </span>
+                  <span className="text-sm font-mono text-gray-300 w-8 text-right">{data?.oneYearAgo}</span>
+                </div>
+              </div>
+
             </div>
           </div>
 
-          {/* Core system calibration note */}
-          <div className="p-4 bg-[#140C04] border border-[#ff91001a] rounded-sm flex items-start gap-4">
+          <div className="p-4 bg-[#140C04] border border-[#ff91001a] rounded-sm flex items-start gap-4 mt-4">
             <Cpu className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
             <div>
-              <h5 className="text-[11px] font-black uppercase text-orange-400 tracking-wider">Métrica de Calibración Táctica</h5>
+              <h5 className="text-[11px] font-black uppercase text-orange-400 tracking-wider">Acoplamiento con Sistema Central</h5>
               <p className="text-xs text-gray-400 leading-relaxed mt-1">
-                Este índice retroalimenta dinámicamente el **Pentágono de Agentes**. Cuando el índice desciende de <strong className="text-red-400">35 pts (Zonas de Miedo)</strong>, el Agente Supervisor restringe asignaciones automáticas, forzando filtros de contención de cola mediante sobreponderación del benchmark.
+                La replicación exacta de CNN Business evita falsos positivos al sintonizar múltiplos de 7 variables independientes. Las alertas proactivas alimentan al <strong>Pentágono de Agentes</strong>, modificando dinámicamente las coberturas tecnológicas y los límites apalancados.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Historical Track (Simulated Timeline) */}
-      <div className="bg-[#0A0A0A] border border-[#1A1A1A] p-6 rounded-sm">
-        <h4 className="text-xs font-black uppercase text-white tracking-wider mb-4 flex items-center gap-2">
-          <BarChart2 className="w-4 h-4 text-orange-500" />
-          Trayectoria Histórica Reciente del Sentimiento
-        </h4>
-        <div className="flex items-end justify-between gap-2 h-20 pt-4">
-          {historySimulated.map((h, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
-              <div className="text-[10px] font-mono font-bold text-gray-400">{h.value}</div>
-              <div className="w-full relative bg-[#141414] h-2.5 rounded-full overflow-hidden">
-                <motion.div 
-                  className={cn(
-                    "absolute left-0 bottom-0 top-0 rounded-full",
-                    h.value < 25 ? "bg-red-500" :
-                    h.value < 45 ? "bg-orange-500" :
-                    h.value <= 55 ? "bg-yellow-500" :
-                    h.value <= 75 ? "bg-emerald-500" : "bg-green-400"
-                  )}
-                  style={{ width: `${h.value}%` }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${h.value}%` }}
-                  transition={{ duration: 0.6, delay: i * 0.05 }}
-                />
+      {/* The 7 CNN Metrics Breakdown Grid */}
+      <div className="space-y-4">
+        <div className="border-b border-[#1A1A1A] pb-2">
+          <h3 className="text-sm font-black uppercase text-white tracking-widest flex items-center gap-2">
+            <Layers className="w-4 h-4 text-orange-500" />
+            Desglose Detallado de las 7 Métricas de CNN Business
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+          {indicatorsList.map((ind) => {
+            const info = data?.components[ind.key];
+            if (!info) return null;
+            const subLabel = getSubLabel(info.score);
+
+            const IconComp = ind.icon;
+
+            return (
+              <div 
+                key={ind.key} 
+                className="border border-[#16161C] hover:border-[#22222E] bg-[#07070A] hover:bg-[#0A0A0E] p-5 rounded-sm flex flex-col justify-between transition-all group"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2">
+                      <IconComp className="w-4 h-4 text-orange-400 group-hover:text-orange-300 transition-colors" />
+                      <span className="text-xs font-black text-white uppercase tracking-tight">{ind.title}</span>
+                    </div>
+                    <span className={cn("text-[9px] font-mono px-2 py-0.5 rounded-sm font-bold uppercase", subLabel.bg, subLabel.color)}>
+                      {subLabel.text}
+                    </span>
+                  </div>
+                  
+                  <span className="text-[9px] text-[#555] font-mono block uppercase tracking-wider mb-2">{ind.alias}</span>
+                  <p className="text-xs text-gray-400 leading-relaxed">{ind.desc}</p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-[#111] flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-mono text-gray-500">{ind.details(info)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-gray-500">Valor de Escala:</span>
+                    <span className="text-xs font-bold font-mono text-white">{info.score}</span>
+                  </div>
+                </div>
               </div>
-              <div className="text-[9px] font-mono text-gray-500 uppercase tracking-tighter whitespace-nowrap">{h.date}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

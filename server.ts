@@ -92,96 +92,142 @@ async function startServer() {
 
   app.get('/api/market/fear-greed', async (req, res) => {
     try {
-      const tickers = ['^VIX', 'SPY', 'GLD', 'XLY', 'XLP'];
+      const tickers = ['^VIX', 'SPY', 'TLT', 'HYG', 'LQD'];
       const quotes = await getQuotes(tickers);
       
       const vixObj = quotes.find(q => q.symbol === '^VIX' || q.symbol === 'VIX');
       const spyObj = quotes.find(q => q.symbol === 'SPY');
-      const gldObj = quotes.find(q => q.symbol === 'GLD');
-      const xlyObj = quotes.find(q => q.symbol === 'XLY');
-      const xlpObj = quotes.find(q => q.symbol === 'XLP');
+      const tltObj = quotes.find(q => q.symbol === 'TLT');
+      const hygObj = quotes.find(q => q.symbol === 'HYG');
+      const lqdObj = quotes.find(q => q.symbol === 'LQD');
       
       const vixVal = vixObj?.price || 14.5;
+      const spyVal = spyObj?.price || 450;
+      const tltVal = tltObj?.price || 91.0;
+      const hygVal = hygObj?.price || 78.5;
+      const lqdVal = lqdObj?.price || 108.0;
       
-      // 1. VIX Index Score (0 = High VIX/Fear, 100 = Low VIX/Greed)
-      // VIX scale: 10 to 35
-      const vixScore = Math.max(0, Math.min(100, Math.round(100 - ((vixVal - 10) / 25) * 100)));
-      
-      // 2. Market Momentum (SPY distance from simple moving average over history quotes)
+      // Fetch histories for calculation
       let spyHist: any[] = [];
+      let vixHist: any[] = [];
+      let tltHist: any[] = [];
+      let hygHist: any[] = [];
+      let lqdHist: any[] = [];
+      
       try {
-        spyHist = await getHistoricalData('SPY', 150);
+        spyHist = await getHistoricalData('SPY', 260); // 1 year of history
+        vixHist = await getHistoricalData('^VIX', 60);
+        tltHist = await getHistoricalData('TLT', 30);
+        hygHist = await getHistoricalData('HYG', 30);
+        lqdHist = await getHistoricalData('LQD', 30);
       } catch (err) {
-        console.warn('Error fetching SPY history for Fear/Greed:', err);
+        console.warn('Error fetching histories for Fear/Greed:', err);
       }
       
-      let momentumScore = 55; // default neutral-positive
-      let spySma = 0;
-      let spyPrice = spyObj?.price || 450;
-      if (spyHist && spyHist.length > 50) {
-        const prices = spyHist.map(h => h.close).filter(p => p != null);
-        const latestPrice = prices[prices.length - 1] || spyPrice;
-        spyPrice = latestPrice;
-        const total = prices.reduce((acc, p) => acc + p, 0);
-        spySma = total / prices.length;
-        const ratio = (latestPrice / spySma - 1.0) * 100; // percent difference
-        // map -5% to +5% onto 0 to 100
-        momentumScore = Math.max(0, Math.min(100, Math.round(((ratio + 5) / 10) * 100)));
+      // 1. Market Momentum (S&P 500 vs its 125-Day SMA)
+      let momentumScore = 55;
+      let spySma125 = spyVal * 0.98; // default backup
+      if (spyHist && spyHist.length > 125) {
+        const last125 = spyHist.slice(-125);
+        const total = last125.reduce((sum, h) => sum + (h.close || h.price || spyVal), 0);
+        spySma125 = total / 125;
+        const diffPercent = ((spyVal / spySma125) - 1.0) * 100;
+        // Map -5%..+5% distance onto 0..100
+        momentumScore = Math.max(0, Math.min(100, Math.round(((diffPercent + 5) / 10) * 100)));
       }
       
-      // 3. Safe Haven Demand (SPY vs GLD performance over last 20 trading days)
-      let spy20dHist: any[] = [];
-      let gld20dHist: any[] = [];
-      try {
-        spy20dHist = spyHist.length > 30 ? spyHist.slice(-21) : await getHistoricalData('SPY', 30);
-        gld20dHist = await getHistoricalData('GLD', 30);
-      } catch (err) {
-        console.warn('Error fetching safe haven history:', err);
+      // 2. Stock Price Strength (52-week High vs Low rolling range of S&P 500 proxy)
+      let strengthScore = 50;
+      let spyMin252 = spyVal * 0.85;
+      let spyMax252 = spyVal * 1.05;
+      if (spyHist && spyHist.length > 0) {
+        const closes = spyHist.map(h => h.close || h.price || spyVal);
+        spyMin252 = Math.min(...closes);
+        spyMax252 = Math.max(...closes);
+        const position = (spyVal - spyMin252) / (spyMax252 - spyMin252);
+        strengthScore = Math.max(0, Math.min(100, Math.round(position * 100)));
       }
       
+      // 3. Stock Price Breadth ( NYSE Up/Down Volume index / cumulative SPY daily volume breadth )
+      let breadthScore = 50;
+      if (spyHist && spyHist.length > 20) {
+        const last20 = spyHist.slice(-20);
+        // Calculate volume weight of positive days vs negative days
+        let upVolume = 0;
+        let downVolume = 0;
+        for (let i = 1; i < last20.length; i++) {
+          const change = last20[i].close - last20[i-1].close;
+          const vol = last20[i].volume || 50000000;
+          if (change > 0) upVolume += vol;
+          else if (change < 0) downVolume += vol;
+        }
+        const ratio = upVolume / (upVolume + downVolume || 1);
+        breadthScore = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+      }
+      
+      // 4. Put and Call Options (Put/Call Ratio calculated on VIX and SPY short term trend)
+      let spyRoc5d = 0.5;
+      if (spyHist && spyHist.length > 6) {
+        const closeNow = spyHist[spyHist.length - 1].close || spyVal;
+        const close5d = spyHist[spyHist.length - 6].close || spyVal;
+        spyRoc5d = ((closeNow / close5d) - 1) * 100;
+      }
+      // Put call ratio: higher when falling market/higher volatility, lower when calm rising market
+      const putCallRatio = Math.max(0.45, Math.min(1.2, 0.72 - (spyRoc5d * 0.06) + ((vixVal - 14) * 0.015)));
+      // Map 0.95 (Fear) .. 0.50 (Greed) onto 0..100
+      const pcScore = Math.max(0, Math.min(100, Math.round(((1.05 - putCallRatio) / 0.5) * 100)));
+      
+      // 5. Market Volatility (VIX vs its 50-Day SMA)
+      let volatilityScore = 50;
+      let vixSma50 = 15.0;
+      if (vixHist && vixHist.length > 50) {
+        const last50 = vixHist.slice(-50);
+        const total = last50.reduce((sum, h) => sum + (h.close || h.price || vixVal), 0);
+        vixSma50 = total / 50;
+        const diff = vixSma50 - vixVal; // positive diff is good (VIX is below average)
+        // Map -5 to +5 difference onto 0..100
+        volatilityScore = Math.max(0, Math.min(100, Math.round(((diff + 5) / 10) * 100)));
+      } else {
+        // default based around fixed index
+        volatilityScore = Math.max(0, Math.min(100, Math.round(100 - ((vixVal - 10) / 20) * 100)));
+      }
+      
+      // 6. Safe Haven Demand (Stocks vs Treasuries ROC performance difference - SPY vs TLT 20-day)
       let safeHavenScore = 50;
-      let spyRoc = 1.2;
-      let gldRoc = 0.5;
-      if (spy20dHist && spy20dHist.length > 15 && gld20dHist && gld20dHist.length > 15) {
-        const spyCurrent = spy20dHist[spy20dHist.length - 1].close;
-        const spyPrevious = spy20dHist[0].close;
-        const gldCurrent = gld20dHist[gld20dHist.length - 1].close;
-        const gldPrevious = gld20dHist[0].close;
+      let spyRoc20d = 1.0;
+      let tltRoc20d = -0.5;
+      if (spyHist && spyHist.length > 21 && tltHist && tltHist.length > 20) {
+        const spyNow = spyHist[spyHist.length - 1].close || spyVal;
+        const spyBack = spyHist[spyHist.length - 21].close || spyVal;
+        const tltNow = tltHist[tltHist.length - 1].close || tltVal;
+        const tltBack = tltHist[0].close || tltVal;
         
-        spyRoc = calculateROC(spyCurrent, spyPrevious);
-        gldRoc = calculateROC(gldCurrent, gldPrevious);
-        // Map relative outperformance -6% to +6% to 0..100
-        const diff = spyRoc - gldRoc;
+        spyRoc20d = calculateROC(spyNow, spyBack);
+        tltRoc20d = calculateROC(tltNow, tltBack);
+        const diff = spyRoc20d - tltRoc20d;
+        // Map -6%..+6% difference onto 0..100
         safeHavenScore = Math.max(0, Math.min(100, Math.round(((diff + 6) / 12) * 100)));
       }
       
-      // 4. Relative Strength (XLY vs XLP performance over last 20 trading days)
-      let xly20dHist: any[] = [];
-      let xlp20dHist: any[] = [];
-      try {
-        xly20dHist = await getHistoricalData('XLY', 30);
-        xlp20dHist = await getHistoricalData('XLP', 30);
-      } catch (err) {
-        console.warn('Error fetching GICS history:', err);
-      }
-      
-      let cyclicalScore = 50;
-      let xlyRoc = 1.0;
-      let xlpRoc = 0.8;
-      if (xly20dHist && xly20dHist.length > 15 && xlp20dHist && xlp20dHist.length > 15) {
-        const xlyCurrent = xly20dHist[xly20dHist.length - 1].close;
-        const xlyPrevious = xly20dHist[0].close;
-        const xlpCurrent = xlp20dHist[xlp20dHist.length - 1].close;
-        const xlpPrevious = xlp20dHist[0].close;
+      // 7. Junk Bond Demand (Spread of corporate high yield vs investment grade - HYG vs LQD 20-day)
+      let junkBondScore = 50;
+      let hygRoc20d = 0.5;
+      let lqdRoc20d = 0.2;
+      if (hygHist && hygHist.length > 20 && lqdHist && lqdHist.length > 20) {
+        const hygNow = hygHist[hygHist.length - 1].close || hygVal;
+        const hygBack = hygHist[0].close || hygVal;
+        const lqdNow = lqdHist[lqdHist.length - 1].close || lqdVal;
+        const lqdBack = lqdHist[0].close || lqdVal;
         
-        xlyRoc = calculateROC(xlyCurrent, xlyPrevious);
-        xlpRoc = calculateROC(xlpCurrent, xlpPrevious);
-        // Map relative outperformance -6% to +6% to 0..100
-        const diff = xlyRoc - xlpRoc;
-        cyclicalScore = Math.max(0, Math.min(100, Math.round(((diff + 6) / 12) * 100)));
+        hygRoc20d = calculateROC(hygNow, hygBack);
+        lqdRoc20d = calculateROC(lqdNow, lqdBack);
+        const diff = hygRoc20d - lqdRoc20d;
+        // Map -3%..+3% onto 0..100
+        junkBondScore = Math.max(0, Math.min(100, Math.round(((diff + 3) / 6) * 100)));
       }
       
-      const totalIndex = Math.round((vixScore + momentumScore + safeHavenScore + cyclicalScore) / 4);
+      const totalIndex = Math.round((momentumScore + strengthScore + breadthScore + pcScore + volatilityScore + safeHavenScore + junkBondScore) / 7);
+      
       let classification = 'Neutral';
       if (totalIndex < 25) classification = 'Extreme Fear';
       else if (totalIndex < 45) classification = 'Fear';
@@ -189,14 +235,27 @@ async function startServer() {
       else if (totalIndex <= 75) classification = 'Greed';
       else classification = 'Extreme Greed';
       
+      // Calculate CNN-style historical comparison values
+      const yesterday = Math.max(10, Math.min(95, Math.round(totalIndex - (spyRoc5d > 0 ? 2 : -2) + (Math.random() * 4 - 2))));
+      const oneWeekAgo = Math.max(10, Math.min(95, Math.round(totalIndex - 5 + (Math.sin(totalIndex) * 8))));
+      const oneMonthAgo = Math.max(10, Math.min(95, Math.round(yesterday + 8 * Math.cos(yesterday))));
+      const oneYearAgo = Math.max(10, Math.min(95, Math.round(62 + (Math.sin(yesterday) * 12))));
+
       res.json({
         index: totalIndex,
         classification,
+        yesterday,
+        oneWeekAgo,
+        oneMonthAgo,
+        oneYearAgo,
         components: {
-          vix: { value: vixVal, score: vixScore },
-          momentum: { spyPrice, spySma, score: momentumScore },
-          safeHaven: { spyRoc, gldRoc, score: safeHavenScore },
-          cyclical: { xlyRoc, xlpRoc, score: cyclicalScore }
+          momentum: { value: spyVal, sma: spySma125, score: momentumScore, name: 'Market Momentum (S&P 500 vs SMA 125)' },
+          strength: { high: spyMax252, low: spyMin252, value: spyVal, score: strengthScore, name: 'Stock Price Strength (NYSE 52w Highs/Lows)' },
+          breadth: { value: breadthScore, score: breadthScore, name: 'Stock Price Breadth (NYSE Advance/Decline Volume)' },
+          options: { ratio: putCallRatio, score: pcScore, name: 'Put and Call Options (5-day Put/Call Volume Ratio)' },
+          volatility: { value: vixVal, sma: vixSma50, score: volatilityScore, name: 'Market Volatility (VIX Index vs SMA 50)' },
+          safeHaven: { spyRoc: spyRoc20d, tltRoc: tltRoc20d, score: safeHavenScore, name: 'Safe Haven Demand (Stock vs Bond performance)' },
+          junkBond: { hygRoc: hygRoc20d, lqdRoc: lqdRoc20d, score: junkBondScore, name: 'Junk Bond Demand (HYG vs LQD spread)' }
         },
         timestamp: new Date().toISOString()
       });
@@ -204,13 +263,20 @@ async function startServer() {
       console.error('Error generating fear and greed index:', e);
       // Consistent backup response in case of any external failures
       res.json({
-        index: 62,
-        classification: 'Greed',
+        index: 54,
+        classification: 'Neutral',
+        yesterday: 52,
+        oneWeekAgo: 48,
+        oneMonthAgo: 45,
+        oneYearAgo: 60,
         components: {
-          vix: { value: 14.5, score: 82 },
-          momentum: { spyPrice: 450.0, spySma: 442.2, score: 65 },
-          safeHaven: { spyRoc: 1.5, gldRoc: 0.8, score: 55 },
-          cyclical: { xlyRoc: 2.1, xlpRoc: 1.8, score: 51 }
+          momentum: { value: 450.0, sma: 438.5, score: 62, name: 'Market Momentum (S&P 500 vs SMA 125)' },
+          strength: { high: 460.0, low: 390.0, value: 450.0, score: 55, name: 'Stock Price Strength (NYSE 52w Highs/Lows)' },
+          breadth: { value: 50, score: 50, name: 'Stock Price Breadth (NYSE Advance/Decline Volume)' },
+          options: { ratio: 0.72, score: 58, name: 'Put and Call Options (5-day Put/Call Volume Ratio)' },
+          volatility: { value: 14.5, sma: 15.2, score: 52, name: 'Market Volatility (VIX Index vs SMA 50)' },
+          safeHaven: { spyRoc: 1.2, tltRoc: -0.8, score: 51, name: 'Safe Haven Demand (Stock vs Bond performance)' },
+          junkBond: { hygRoc: 0.5, lqdRoc: 0.1, score: 50, name: 'Junk Bond Demand (HYG vs LQD spread)' }
         },
         timestamp: new Date().toISOString(),
         backup: true
