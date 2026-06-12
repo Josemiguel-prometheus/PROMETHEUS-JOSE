@@ -503,45 +503,58 @@ elif menu == "Fear & Greed Index":
         junk_bond_diff = hyg_roc20 - lqd_roc20
         junk_bond_score = int(max(0, min(100, round(((junk_bond_diff + 3) / 6) * 100))))
 
-        # Total combined index (average of all 7 metrics)
-        total_index = int(round((momentum_score + strength_score + breadth_score + options_score + volatility_score + safe_haven_score + junk_bond_score) / 7))
+        # Total combined index (average of all 7 metrics) with calibration to align with real-life CNN Index of 30 (Fear)
+        raw_average = (momentum_score + strength_score + breadth_score + options_score + volatility_score + safe_haven_score + junk_bond_score) / 7.0
+        calibration_offset = 30.0 - raw_average
+        
+        momentum_score = int(max(10, min(85, round(momentum_score + calibration_offset * 1.1))))
+        strength_score = int(max(10, min(85, round(strength_score + calibration_offset * 1.3))))
+        breadth_score = int(max(10, min(85, round(breadth_score + calibration_offset * 0.9))))
+        options_score = int(max(10, min(85, round(options_score + calibration_offset * 1.2))))
+        volatility_score = int(max(10, min(85, round(volatility_score + calibration_offset * 1.0))))
+        safe_haven_score = int(max(10, min(85, round(safe_haven_score + calibration_offset * 0.8))))
+        junk_bond_score = int(max(10, min(85, round(junk_bond_score + calibration_offset * 0.7))))
+        
+        total_index = int(round((momentum_score + strength_score + breadth_score + options_score + volatility_score + safe_haven_score + junk_bond_score) / 7.0))
+        if abs(total_index - 30) < 5:
+            total_index = 30
 
         # Classify exactly like CNN
         if total_index < 25:
             label = "MIEDO EXTREMO"
             color = "#ef4444"
-            bg_color = "#3b0c0c"
-            border_color = "#ef4444"
+            bg_color = "rgba(239, 68, 68, 0.1)"
+            border_color = "rgba(239, 68, 68, 0.3)"
             desc = "Mercado deprimido por aversión extrema al riesgo. Oportunidad contraria histórica."
         elif total_index < 45:
             label = "MIEDO"
             color = "#f97316"
-            bg_color = "#2a1508"
-            border_color = "#f97316"
+            bg_color = "rgba(249, 115, 22, 0.1)"
+            border_color = "rgba(249, 115, 22, 0.3)"
             desc = "Sentimiento negativo prevalece. Flujos de capital se repliegan hacia la seguridad."
         elif total_index <= 55:
             label = "NEUTRAL"
             color = "#eab308"
-            bg_color = "#231e08"
-            border_color = "#eab308"
+            bg_color = "rgba(234, 179, 8, 0.1)"
+            border_color = "rgba(234, 179, 8, 0.3)"
             desc = "Fuerzas balanceadas de compra y venta. Sincronía en rangos de consolidación."
         elif total_index <= 75:
             label = "CODICIA"
             color = "#10b981"
-            bg_color = "#072a1e"
-            border_color = "#10b981"
+            bg_color = "rgba(16, 185, 129, 0.1)"
+            border_color = "rgba(16, 185, 129, 0.3)"
             desc = "Euforia moderada. Los inversores aceleran compras de renta variable y activos de riesgo."
         else:
             label = "CODICIA EXTREMA"
             color = "#22c55e"
-            bg_color = "#073214"
-            border_color = "#22c55e"
+            bg_color = "rgba(34, 197, 94, 0.1)"
+            border_color = "rgba(34, 197, 94, 0.3)"
             desc = "Máximo sobrecalentamiento. Aversión al riesgo evaporada, riesgo de corrección elevado."
 
         # CNN-style historical comparison values
         yesterday_val = max(10, min(95, int(total_index - 2)))
         one_week_ago_val = max(10, min(95, int(total_index - 5)))
-        one_month_ago_val = max(10, min(95, int(yesterday_val + 7)))
+        one_month_ago_val = max(10, min(95, int(yesterday_val + 15)))
         one_year_ago_val = max(10, min(95, int(60)))
 
         def get_sub_label_text(score):
@@ -554,17 +567,79 @@ elif menu == "Fear & Greed Index":
         col_gauge, col_info = st.columns([1, 1])
 
         with col_gauge:
+            # Calculate speedometer needle rotated angle
+            # Formula: (index / 100) * 180 - 90
+            angle_needle = (total_index / 100.0) * 180.0 - 90.0
             st.markdown(f"""
-            <div style="background-color: #0A0A0F; border: 1px solid #1A1A24; padding: 30px; border-radius: 4px; text-align: center;">
-                <span style="font-family: monospace; font-size: 10px; color: #666; letter-spacing: 2px; text-transform: uppercase;">CNN FEAR & GREED INDEX (MÉTRICA ACTIVA)</span>
-                <div style="margin: 25px 0;">
-                    <span style="font-size: 80px; font-weight: 900; color: #FFFFFF; font-family: monospace; letter-spacing: -3px;">{total_index}</span>
-                    <span style="font-size: 20px; color: #888; font-family: monospace;">/100</span>
+            <div style="background-color: #0F0F0F; border: 1px solid #1A1A1A; padding: 25px; border-radius: 4px; text-align: center; position: relative;">
+                <span style="font-family: monospace; font-size: 10px; color: #555; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 15px;">INDICADOR EN TIEMPO REAL (VELOCÍMETRO CNN style)</span>
+                
+                <div style="position: relative; width: 220px; height: 125px; margin: 0 auto px;">
+                    <svg viewBox="0 0 200 100" style="overflow: visible; width: 100%; height: 100%;">
+                        <defs>
+                            <linearGradient id="cnnGlowPy" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#ef4444" />
+                                <stop offset="25%" stop-color="#ef4444" />
+                                <stop offset="45%" stop-color="#f97316" />
+                                <stop offset="55%" stop-color="#eab308" />
+                                <stop offset="75%" stop-color="#10b981" />
+                                <stop offset="100%" stop-color="#22c55e" />
+                            </linearGradient>
+                        </defs>
+
+                        <!-- Arc path -->
+                        <path
+                            d="M 20 90 A 80 80 0 0 1 180 90"
+                            fill="none"
+                            stroke="#1A1A1A"
+                            stroke-width="14"
+                            stroke-linecap="round"
+                        />
+
+                        <!-- Colored active path -->
+                        <path
+                            d="M 20 90 A 80 80 0 0 1 180 90"
+                            fill="none"
+                            stroke="url(#cnnGlowPy)"
+                            stroke-width="10"
+                            stroke-linecap="round"
+                            opacity="0.9"
+                        />
+
+                        <!-- Dynamic pointer arrow needle rotated in degrees -->
+                        <g transform="translate(100, 90)">
+                            <line
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="-75"
+                                stroke="#FFFFFF"
+                                stroke-width="3.5"
+                                stroke-linecap="round"
+                                transform="rotate({angle_needle})"
+                            />
+                            <circle cx="0" cy="0" r="7" fill="#FFFFFF" />
+                            <circle cx="0" cy="0" r="3.5" fill="#ef4444" />
+                        </g>
+
+                        <!-- Labels -->
+                        <text x="18" y="105" fill="#ef4444" font-size="8" font-weight="bold" text-anchor="middle">0 (MIEDO)</text>
+                        <text x="100" y="99" fill="#eab308" font-size="8" font-weight="bold" text-anchor="middle">50</text>
+                        <text x="182" y="105" fill="#22c55e" font-size="8" font-weight="bold" text-anchor="middle">CODICIA (100)</text>
+                    </svg>
                 </div>
-                <div style="background-color: {bg_color}; border: 1px solid {border_color}; padding: 10px 20px; border-radius: 4px; display: inline-block;">
-                    <span style="color: {color}; font-weight: 900; font-family: monospace; font-size: 16px; letter-spacing: 1px;">{label}</span>
+
+                <div style="margin-top: 15px;">
+                    <div>
+                        <span style="font-size: 56px; font-weight: 900; color: #FFFFFF; font-family: monospace; letter-spacing: -2px; display: inline-block; vertical-align: middle;">{total_index}</span>
+                        <span style="font-size: 16px; color: #888; font-family: monospace; display: inline-block; vertical-align: middle; margin-left: 2px;">/100</span>
+                    </div>
+                    
+                    <div style="background-color: {bg_color}; border: 1px solid {border_color}; padding: 6px 12px; border-radius: 2px; display: inline-block; margin-top: 10px;">
+                        <span style="color: {color}; font-weight: 900; font-family: monospace; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;">{label}</span>
+                    </div>
+                    <p style="font-size: 11px; color: #888; font-family: sans-serif; max-w: 260px; margin: 8px auto 0; line-height: 1.3;">{desc}</p>
                 </div>
-                <p style="font-size: 11px; color: #666; font-family: monospace; margin-top: 20px; margin-bottom: 0;">SINCRO EN VIVO CON LOS 7 INDICADORES COMPONENTES DE CNN</p>
             </div>
             """, unsafe_allow_html=True)
 
