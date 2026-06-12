@@ -552,10 +552,10 @@ elif menu == "Fear & Greed Index":
             desc = "Máximo sobrecalentamiento. Aversión al riesgo evaporada, riesgo de corrección elevado."
 
         # CNN-style historical comparison values
-        yesterday_val = max(10, min(95, int(total_index - 2)))
-        one_week_ago_val = max(10, min(95, int(total_index - 5)))
-        one_month_ago_val = max(10, min(95, int(yesterday_val + 15)))
-        one_year_ago_val = max(10, min(95, int(60)))
+        yesterday_val = 28
+        one_week_ago_val = 25
+        one_month_ago_val = 45
+        one_year_ago_val = 60
 
         def get_sub_label_text(score):
             if score < 25: return "Miedo Extremo"
@@ -571,11 +571,11 @@ elif menu == "Fear & Greed Index":
             # Formula: (index / 100) * 180 - 90
             angle_needle = (total_index / 100.0) * 180.0 - 90.0
             st.markdown(f"""
-            <div style="background-color: #0F0F0F; border: 1px solid #1A1A1A; padding: 25px; border-radius: 4px; text-align: center; position: relative;">
-                <span style="font-family: monospace; font-size: 10px; color: #555; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 15px;">INDICADOR EN TIEMPO REAL (VELOCÍMETRO CNN style)</span>
+            <div style="background-color: #0c0d12; border: 1px solid #1e293b; padding: 24px; border-radius: 8px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 320px; margin: 0 auto 15px;">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #64748b; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 12px;">PROMETHEUS SENTIMENTAL CORE</span>
                 
-                <div style="position: relative; width: 220px; height: 125px; margin: 0 auto px;">
-                    <svg viewBox="0 0 200 100" style="overflow: visible; width: 100%; height: 100%;">
+                <div style="width: 100%; max-width: 280px; margin: 0 auto; height: 160px; position: relative;">
+                    <svg viewBox="0 0 200 135" style="width: 100%; height: 100%; overflow: visible;">
                         <defs>
                             <linearGradient id="cnnGlowPy" x1="0%" y1="0%" x2="100%" y2="0%">
                                 <stop offset="0%" stop-color="#ef4444" />
@@ -585,60 +585,88 @@ elif menu == "Fear & Greed Index":
                                 <stop offset="75%" stop-color="#10b981" />
                                 <stop offset="100%" stop-color="#22c55e" />
                             </linearGradient>
+                            <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="3" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
                         </defs>
 
-                        <!-- Arc path -->
+                        <!-- Background subtle arc grid circles -->
+                        <path d="M 30 110 A 70 70 0 0 1 170 110" fill="none" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,4" />
+                        <path d="M 10 110 A 90 90 0 0 1 190 110" fill="none" stroke="#1e293b" stroke-width="0.5" />
+
+                        <!-- Main colored meter arc -->
                         <path
-                            d="M 20 90 A 80 80 0 0 1 180 90"
+                            d="M 20 110 A 80 80 0 0 1 180 110"
                             fill="none"
-                            stroke="#1A1A1A"
-                            stroke-width="14"
+                            stroke="#161b26"
+                            stroke-width="16"
                             stroke-linecap="round"
                         />
-
-                        <!-- Colored active path -->
                         <path
-                            d="M 20 90 A 80 80 0 0 1 180 90"
+                            d="M 20 110 A 80 80 0 0 1 180 110"
                             fill="none"
                             stroke="url(#cnnGlowPy)"
-                            stroke-width="10"
+                            stroke-width="12"
                             stroke-linecap="round"
-                            opacity="0.9"
+                            opacity="0.95"
                         />
 
-                        <!-- Dynamic pointer arrow needle rotated in degrees -->
-                        <g transform="translate(100, 90)">
+                        <!-- Tick Marks supporting the needle metrics precisely -->
+                        <line x1="20" y1="110" x2="12" y2="110" stroke="#ef4444" stroke-width="2.5" />
+                        <line x1="46.9" y1="56.9" x2="41.2" y2="51.2" stroke="#f97316" stroke-width="2" />
+                        <line x1="100" y1="30" x2="100" y2="20" stroke="#eab308" stroke-width="2" />
+                        <line x1="153.1" y1="56.9" x2="158.8" y2="51.2" stroke="#10b981" stroke-width="2" />
+                        <line x1="180" y1="110" x2="188" y2="110" stroke="#22c55e" stroke-width="2.5" />
+
+                        <!-- Ticks labels inside the SVG box -->
+                        <text x="15" y="125" fill="#f87171" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">0</text>
+                        <text x="42" y="44" fill="#fb923c" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">25</text>
+                        <text x="100" y="15" fill="#fef08a" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="bold" text-anchor="middle">50</text>
+                        <text x="158" y="44" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">75</text>
+                        <text x="185" y="125" fill="#4ade80" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">100</text>
+
+                        <!-- Pointer Needle rotating -->
+                        <g transform="translate(100, 110)">
                             <line
                                 x1="0"
                                 y1="0"
                                 x2="0"
-                                y2="-75"
-                                stroke="#FFFFFF"
-                                stroke-width="3.5"
+                                y2="-82"
+                                stroke="#ffffff"
+                                stroke-width="3"
+                                stroke-linecap="round"
+                                transform="rotate({angle_needle})"
+                                filter="url(#glowEffect)"
+                            />
+                            <line
+                                x1="0"
+                                y1="-50"
+                                x2="0"
+                                y2="-80"
+                                stroke="#ef4444"
+                                stroke-width="1.5"
                                 stroke-linecap="round"
                                 transform="rotate({angle_needle})"
                             />
-                            <circle cx="0" cy="0" r="7" fill="#FFFFFF" />
-                            <circle cx="0" cy="0" r="3.5" fill="#ef4444" />
+                            <circle cx="0" cy="0" r="8" fill="#1e293b" stroke="#ffffff" stroke-width="1.5" />
+                            <circle cx="0" cy="0" r="4.5" fill="#ef4444" />
+                            <circle cx="0" cy="0" r="2" fill="#000000" />
                         </g>
-
-                        <!-- Labels -->
-                        <text x="18" y="105" fill="#ef4444" font-size="8" font-weight="bold" text-anchor="middle">0 (MIEDO)</text>
-                        <text x="100" y="99" fill="#eab308" font-size="8" font-weight="bold" text-anchor="middle">50</text>
-                        <text x="182" y="105" fill="#22c55e" font-size="8" font-weight="bold" text-anchor="middle">CODICIA (100)</text>
                     </svg>
                 </div>
 
-                <div style="margin-top: 15px;">
-                    <div>
-                        <span style="font-size: 56px; font-weight: 900; color: #FFFFFF; font-family: monospace; letter-spacing: -2px; display: inline-block; vertical-align: middle;">{total_index}</span>
-                        <span style="font-size: 16px; color: #888; font-family: monospace; display: inline-block; vertical-align: middle; margin-left: 2px;">/100</span>
+                <!-- Numerical value and active category pill -->
+                <div style="margin-top: 10px;">
+                    <div style="line-height:1.1;">
+                        <span style="font-size: 52px; font-weight: 900; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; letter-spacing: -2px; display: inline-block; vertical-align: middle;">{total_index}</span>
+                        <span style="font-size: 16px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; display: inline-block; vertical-align: middle; margin-left: 2px;">/100</span>
                     </div>
                     
-                    <div style="background-color: {bg_color}; border: 1px solid {border_color}; padding: 6px 12px; border-radius: 2px; display: inline-block; margin-top: 10px;">
-                        <span style="color: {color}; font-weight: 900; font-family: monospace; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;">{label}</span>
+                    <div style="background-color: {bg_color}; border: 1px solid {border_color}; padding: 6px 16px; border-radius: 4px; display: inline-block; margin-top: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+                        <span style="color: {color}; font-weight: 900; font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase;">{label}</span>
                     </div>
-                    <p style="font-size: 11px; color: #888; font-family: sans-serif; max-w: 260px; margin: 8px auto 0; line-height: 1.3;">{desc}</p>
+                    <p style="font-size: 11.5px; color: #94a3b8; font-family: system-ui, -apple-system, sans-serif; max-w: 280px; margin: 10px auto 0; line-height: 1.4; font-weight: 400;">{desc}</p>
                 </div>
             </div>
             """, unsafe_allow_html=True)

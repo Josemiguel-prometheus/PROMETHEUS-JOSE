@@ -217,8 +217,8 @@ export default function FearGreedPanel() {
           <span className="text-[10px] uppercase font-mono tracking-widest text-[#555] mb-4">INDICADOR ACTIVO EN TIEMPO REAL</span>
 
           {/* SVG Gauge */}
-          <div className="relative w-64 h-36 flex items-center justify-center mt-2">
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 200 100">
+          <div className="relative w-full max-w-[280px] h-44 flex items-center justify-center mt-2">
+            <svg className="w-full h-full overflow-visible" viewBox="0 0 200 135">
               <defs>
                 <linearGradient id="cnnGlow" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#ef4444" />
@@ -228,54 +228,84 @@ export default function FearGreedPanel() {
                   <stop offset="75%" stopColor="#10b981" />
                   <stop offset="100%" stopColor="#22c55e" />
                 </linearGradient>
+                <filter id="reactGlowEffect" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
               </defs>
 
-              {/* Arc path */}
+              {/* Background subtle arc grid circles */}
+              <path d="M 30 110 A 70 70 0 0 1 170 110" fill="none" stroke="#262626" strokeWidth="1" strokeDasharray="2,4" />
+              <path d="M 10 110 A 90 90 0 0 1 190 110" fill="none" stroke="#1c1c1c" strokeWidth="0.5" />
+
+              {/* Arc paths */}
               <path
-                d="M 20 90 A 80 80 0 0 1 180 90"
+                d="M 20 110 A 80 80 0 0 1 180 110"
                 fill="none"
                 stroke="#1A1A1A"
-                strokeWidth="14"
+                strokeWidth="16"
                 strokeLinecap="round"
               />
 
               {/* Colored active path */}
               <path
-                d="M 20 90 A 80 80 0 0 1 180 90"
+                d="M 20 110 A 80 80 0 0 1 180 110"
                 fill="none"
                 stroke="url(#cnnGlow)"
-                strokeWidth="10"
+                strokeWidth="12"
                 strokeLinecap="round"
-                opacity="0.9"
+                opacity="0.95"
               />
 
+              {/* Tick Marks for extreme precise alignment */}
+              <line x1="20" y1="110" x2="12" y2="110" stroke="#ef4444" strokeWidth="2.5" />
+              <line x1="46.9" y1="56.9" x2="41.2" y2="51.2" stroke="#f97316" strokeWidth="2" />
+              <line x1="100" y1="30" x2="100" y2="20" stroke="#eab308" strokeWidth="2" />
+              <line x1="153.1" y1="56.9" x2="158.8" y2="51.2" stroke="#10b981" strokeWidth="2" />
+              <line x1="180" y1="110" x2="188" y2="110" stroke="#22c55e" strokeWidth="2.5" />
+
+              {/* Tick Labels */}
+              <text x="15" y="125" fill="#f87171" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">0</text>
+              <text x="42" y="44" fill="#fb923c" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">25</text>
+              <text x="100" y="15" fill="#fef08a" fontFamily="monospace" fontSize="9" fontWeight="bold" textAnchor="middle">50</text>
+              <text x="158" y="44" fill="#34d399" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">75</text>
+              <text x="185" y="125" fill="#4ade80" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">100</text>
+
               {/* Dynamic pointer arrow needle */}
-              <g transform={`translate(100, 90)`}>
-                <motion.line
+              <g transform="translate(100, 110)">
+                <line
                   x1="0"
                   y1="0"
                   x2="0"
-                  y2="-75"
+                  y2="-82"
                   stroke="#FFFFFF"
-                  strokeWidth="3.5"
+                  strokeWidth="3"
                   strokeLinecap="round"
-                  animate={{ rotate: angle }}
-                  transition={{ type: 'spring', stiffness: 50, damping: 10 }}
+                  transform={`rotate(${angle})`}
+                  style={{ transformOrigin: '0px 0px' }}
+                  filter="url(#reactGlowEffect)"
                 />
-                <circle cx="0" cy="0" r="7" fill="#FFFFFF" />
-                <circle cx="0" cy="0" r="3.5" fill="#ef4444" />
+                <line
+                  x1="0"
+                  y1="-50"
+                  x2="0"
+                  y2="-80"
+                  stroke="#ef4444"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  transform={`rotate(${angle})`}
+                  style={{ transformOrigin: '0px 0px' }}
+                />
+                <circle cx="0" cy="0" r="8" fill="#1e293b" stroke="#ffffff" strokeWidth="1.5" />
+                <circle cx="0" cy="0" r="4.5" fill="#ef4444" />
+                <circle cx="0" cy="0" r="2" fill="#000000" />
               </g>
-
-              {/* Labels */}
-              <text x="18" y="105" fill="#ef4444" fontSize="8" fontWeight="bold" textAnchor="middle">0 (MIEDO)</text>
-              <text x="100" y="99" fill="#eab308" fontSize="8" fontWeight="bold" textAnchor="middle">50</text>
-              <text x="182" y="105" fill="#22c55e" fontSize="8" fontWeight="bold" textAnchor="middle">CODICIA (100)</text>
             </svg>
 
             {/* Float value */}
-            <div className="absolute bottom-0 text-center">
+            <div className="absolute bottom-1 bg-black/80 px-4 py-1.5 rounded border border-[#222] backdrop-blur-md">
               <motion.div 
-                className="text-6xl font-black font-mono tracking-tighter text-white"
+                className="text-4xl font-black font-mono tracking-tighter text-white"
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 key={indexVal}
