@@ -575,7 +575,7 @@ elif menu == "Fear & Greed Index":
                 
                 <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 4px 10px; background-color: rgba(2, 6, 23, 0.9); border: 1px solid rgba(249, 115, 22, 0.3); border-radius: 4px;">
                     <span style="display: inline-block; width: 6px; height: 6px; background-color: #f97316; border-radius: 50%;"></span>
-                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f97316; letter-spacing: 1px; text-transform: uppercase; font-weight: 900; line-height: 1;">PROMETHEUS SENTIMENTAL CORE</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f97316; letter-spacing: 1px; text-transform: uppercase; font-weight: 900; line-height: 1;">SENSADO DE SENTIMIENTO: CNN FEAR & GREED INDEX</span>
                 </div>
                 
                 <div style="width: 100%; max-width: 280px; margin: 0 auto; height: 175px; position: relative;">

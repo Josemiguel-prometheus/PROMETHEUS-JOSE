@@ -217,7 +217,7 @@ export default function FearGreedPanel() {
           <div className="flex items-center gap-2 mb-6 z-10 px-4 py-1.5 bg-slate-950/90 rounded border border-orange-500/30">
             <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
             <span className="text-[12px] font-mono font-black uppercase tracking-wider text-orange-400">
-              PROMETHEUS SENTIMENTAL CORE
+              SENSADO DE SENTIMIENTO: CNN FEAR & GREED INDEX
             </span>
           </div>
 
