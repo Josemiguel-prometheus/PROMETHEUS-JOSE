@@ -571,11 +571,11 @@ elif menu == "Fear & Greed Index":
             # Formula: (index / 100) * 180 - 90
             angle_needle = (total_index / 100.0) * 180.0 - 90.0
             st.markdown(f"""
-            <div style="background-color: #0c0d12; border: 1px solid #1e293b; padding: 24px; border-radius: 8px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 320px; margin: 0 auto 15px;">
-                <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #64748b; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 12px;">PROMETHEUS SENTIMENTAL CORE</span>
+            <div style="background-color: #0c0d12; border: 1px solid #1e293b; padding: 24px; border-radius: 8px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 320px; margin: 0 auto 15px; position: relative;">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f97316; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 15px; font-weight: bold; text-shadow: 0 0 10px rgba(249,115,22,0.2);">PROMETHEUS SENTIMENTAL CORE</span>
                 
-                <div style="width: 100%; max-width: 280px; margin: 0 auto; height: 160px; position: relative;">
-                    <svg viewBox="0 0 200 135" style="width: 100%; height: 100%; overflow: visible;">
+                <div style="width: 100%; max-width: 280px; margin: 0 auto; height: 175px; position: relative;">
+                    <svg viewBox="0 0 240 145" style="width: 100%; height: 100%; overflow: visible;">
                         <defs>
                             <linearGradient id="cnnGlowPy" x1="0%" y1="0%" x2="100%" y2="0%">
                                 <stop offset="0%" stop-color="#ef4444" />
@@ -592,19 +592,19 @@ elif menu == "Fear & Greed Index":
                         </defs>
 
                         <!-- Background subtle arc grid circles -->
-                        <path d="M 30 110 A 70 70 0 0 1 170 110" fill="none" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,4" />
-                        <path d="M 10 110 A 90 90 0 0 1 190 110" fill="none" stroke="#1e293b" stroke-width="0.5" />
+                        <path d="M 45 115 A 75 75 0 0 1 195 115" fill="none" stroke="#1c2538" stroke-width="1" stroke-dasharray="2,4" />
+                        <path d="M 25 115 A 95 95 0 0 1 215 115" fill="none" stroke="#161e2e" stroke-width="0.5" />
 
                         <!-- Main colored meter arc -->
                         <path
-                            d="M 20 110 A 80 80 0 0 1 180 110"
+                            d="M 35 115 A 85 85 0 0 1 205 115"
                             fill="none"
                             stroke="#161b26"
                             stroke-width="16"
                             stroke-linecap="round"
                         />
                         <path
-                            d="M 20 110 A 80 80 0 0 1 180 110"
+                            d="M 35 115 A 85 85 0 0 1 205 115"
                             fill="none"
                             stroke="url(#cnnGlowPy)"
                             stroke-width="12"
@@ -612,22 +612,39 @@ elif menu == "Fear & Greed Index":
                             opacity="0.95"
                         />
 
-                        <!-- Tick Marks supporting the needle metrics precisely -->
-                        <line x1="20" y1="110" x2="12" y2="110" stroke="#ef4444" stroke-width="2.5" />
-                        <line x1="46.9" y1="56.9" x2="41.2" y2="51.2" stroke="#f97316" stroke-width="2" />
-                        <line x1="100" y1="30" x2="100" y2="20" stroke="#eab308" stroke-width="2" />
-                        <line x1="153.1" y1="56.9" x2="158.8" y2="51.2" stroke="#10b981" stroke-width="2" />
-                        <line x1="180" y1="110" x2="188" y2="110" stroke="#22c55e" stroke-width="2.5" />
+                        <!-- Ticks Group rotated from center (120, 115) -->
+                        <g transform="translate(120, 115)">
+                            <!-- Tick 0 rotated -90 deg -->
+                            <g transform="rotate(-90)">
+                                <line x1="0" y1="-85" x2="0" y2="-95" stroke="#ef4444" stroke-width="3" />
+                            </g>
+                            <!-- Tick 25 rotated -45 deg -->
+                            <g transform="rotate(-45)">
+                                <line x1="0" y1="-85" x2="0" y2="-93" stroke="#f97316" stroke-width="2" />
+                            </g>
+                            <!-- Tick 50 rotated 0 deg -->
+                            <g transform="rotate(0)">
+                                <line x1="0" y1="-85" x2="0" y2="-95" stroke="#eab308" stroke-width="2.5" />
+                            </g>
+                            <!-- Tick 75 rotated 45 deg -->
+                            <g transform="rotate(45)">
+                                <line x1="0" y1="-85" x2="0" y2="-93" stroke="#10b981" stroke-width="2" />
+                            </g>
+                            <!-- Tick 100 rotated 90 deg -->
+                            <g transform="rotate(90)">
+                                <line x1="0" y1="-85" x2="0" y2="-95" stroke="#22c55e" stroke-width="3" />
+                            </g>
+                        </g>
 
-                        <!-- Ticks labels inside the SVG box -->
-                        <text x="15" y="125" fill="#f87171" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">0</text>
-                        <text x="42" y="44" fill="#fb923c" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">25</text>
-                        <text x="100" y="15" fill="#fef08a" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="bold" text-anchor="middle">50</text>
-                        <text x="158" y="44" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">75</text>
-                        <text x="185" y="125" fill="#4ade80" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">100</text>
+                        <!-- Ticks labels inside the SVG box, carefully adjusted -->
+                        <text x="20" y="123" fill="#f87171" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">0</text>
+                        <text x="50" y="55" fill="#fb923c" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">25</text>
+                        <text x="120" y="16" fill="#fef08a" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="bold" text-anchor="middle">50</text>
+                        <text x="190" y="55" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">75</text>
+                        <text x="220" y="123" fill="#4ade80" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">100</text>
 
                         <!-- Pointer Needle rotating -->
-                        <g transform="translate(100, 110)">
+                        <g transform="translate(120, 115)">
                             <line
                                 x1="0"
                                 y1="0"
@@ -654,6 +671,12 @@ elif menu == "Fear & Greed Index":
                             <circle cx="0" cy="0" r="2" fill="#000000" />
                         </g>
                     </svg>
+
+                    <!-- Embedded floating metric box -->
+                    <div style="position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.95); border: 1px solid #1e293b; padding: 4px 14px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 10; line-height: 1;">
+                        <span style="font-size: 20px; font-weight: 900; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.5px;">{total_index}</span>
+                        <span style="font-size: 11px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; margin-left: 1px;">/100</span>
+                    </div>
                 </div>
 
                 <!-- Numerical value and active category pill -->

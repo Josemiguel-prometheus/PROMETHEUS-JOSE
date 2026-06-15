@@ -211,14 +211,17 @@ export default function FearGreedPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
         
         {/* Left Side: Semi-circle Gauge */}
-        <div className="lg:col-span-5 bg-[#0F0F0F] border border-[#1A1A1A] p-8 rounded-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
+        <div className="lg:col-span-5 bg-[#0c0d12] border border-[#1e293b] p-8 rounded-sm flex flex-col items-center justify-center text-center relative overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#111_1px,transparent_1px),linear-gradient(to_bottom,#111_1px,transparent_1px)] bg-[size:16px_16px] opacity-20 pointer-events-none" />
           
-          <span className="text-[10px] uppercase font-mono tracking-widest text-[#555] mb-4">INDICADOR ACTIVO EN TIEMPO REAL</span>
+          <span className="text-[11px] uppercase font-mono tracking-widest text-[#64748b] mb-4 flex items-center gap-1.5 font-bold">
+            <Cpu className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+            PROMETHEUS SENTIMENTAL CORE
+          </span>
 
           {/* SVG Gauge */}
-          <div className="relative w-full max-w-[280px] h-44 flex items-center justify-center mt-2">
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 200 135">
+          <div className="relative w-full max-w-[280px] h-48 flex items-center justify-center mt-2">
+            <svg className="w-full h-full overflow-visible" viewBox="0 0 240 145">
               <defs>
                 <linearGradient id="cnnGlow" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#ef4444" />
@@ -235,21 +238,21 @@ export default function FearGreedPanel() {
               </defs>
 
               {/* Background subtle arc grid circles */}
-              <path d="M 30 110 A 70 70 0 0 1 170 110" fill="none" stroke="#262626" strokeWidth="1" strokeDasharray="2,4" />
-              <path d="M 10 110 A 90 90 0 0 1 190 110" fill="none" stroke="#1c1c1c" strokeWidth="0.5" />
+              <path d="M 45 115 A 75 75 0 0 1 195 115" fill="none" stroke="#1c2538" strokeWidth="1" strokeDasharray="2,4" />
+              <path d="M 25 115 A 95 95 0 0 1 215 115" fill="none" stroke="#161e2e" strokeWidth="0.5" />
 
-              {/* Arc paths */}
+              {/* Base grey background arc */}
               <path
-                d="M 20 110 A 80 80 0 0 1 180 110"
+                d="M 35 115 A 85 85 0 0 1 205 115"
                 fill="none"
-                stroke="#1A1A1A"
+                stroke="#161b26"
                 strokeWidth="16"
                 strokeLinecap="round"
               />
 
-              {/* Colored active path */}
+              {/* Colored active gradient arc */}
               <path
-                d="M 20 110 A 80 80 0 0 1 180 110"
+                d="M 35 115 A 85 85 0 0 1 205 115"
                 fill="none"
                 stroke="url(#cnnGlow)"
                 strokeWidth="12"
@@ -257,23 +260,40 @@ export default function FearGreedPanel() {
                 opacity="0.95"
               />
 
-              {/* Tick Marks for extreme precise alignment */}
-              <line x1="20" y1="110" x2="12" y2="110" stroke="#ef4444" strokeWidth="2.5" />
-              <line x1="46.9" y1="56.9" x2="41.2" y2="51.2" stroke="#f97316" strokeWidth="2" />
-              <line x1="100" y1="30" x2="100" y2="20" stroke="#eab308" strokeWidth="2" />
-              <line x1="153.1" y1="56.9" x2="158.8" y2="51.2" stroke="#10b981" strokeWidth="2" />
-              <line x1="180" y1="110" x2="188" y2="110" stroke="#22c55e" strokeWidth="2.5" />
+              {/* Ticks Group rotated from center (120, 115) */}
+              <g transform="translate(120, 115)">
+                {/* Tick 0 (Miedo Extremo) rotated -90 deg */}
+                <g transform="rotate(-90)">
+                  <line x1="0" y1="-85" x2="0" y2="-95" stroke="#ef4444" strokeWidth="3" />
+                </g>
+                {/* Tick 25 (Miedo) rotated -45 deg */}
+                <g transform="rotate(-45)">
+                  <line x1="0" y1="-85" x2="0" y2="-93" stroke="#f97316" strokeWidth="2" />
+                </g>
+                {/* Tick 50 (Neutral) rotated 0 deg */}
+                <g transform="rotate(0)">
+                  <line x1="0" y1="-85" x2="0" y2="-95" stroke="#eab308" strokeWidth="2.5" />
+                </g>
+                {/* Tick 75 (Codicia) rotated 45 deg */}
+                <g transform="rotate(45)">
+                  <line x1="0" y1="-85" x2="0" y2="-93" stroke="#10b981" strokeWidth="2" />
+                </g>
+                {/* Tick 100 (Codicia Extrema) rotated 90 deg */}
+                <g transform="rotate(90)">
+                  <line x1="0" y1="-85" x2="0" y2="-95" stroke="#22c55e" strokeWidth="3" />
+                </g>
+              </g>
 
-              {/* Tick Labels */}
-              <text x="15" y="125" fill="#f87171" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">0</text>
-              <text x="42" y="44" fill="#fb923c" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">25</text>
-              <text x="100" y="15" fill="#fef08a" fontFamily="monospace" fontSize="9" fontWeight="bold" textAnchor="middle">50</text>
-              <text x="158" y="44" fill="#34d399" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">75</text>
-              <text x="185" y="125" fill="#4ade80" fontFamily="monospace" fontSize="8" fontWeight="bold" textAnchor="middle">100</text>
+              {/* Tick Labels - positioned with absolute clarity to prevent clipping */}
+              <text x="20" y="123" fill="#f87171" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">0</text>
+              <text x="50" y="55" fill="#fb923c" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">25</text>
+              <text x="120" y="16" fill="#fef08a" fontFamily="'JetBrains Mono', monospace" fontSize="11" fontWeight="bold" textAnchor="middle">50</text>
+              <text x="190" y="55" fill="#34d399" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">75</text>
+              <text x="220" y="123" fill="#4ade80" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">100</text>
 
               {/* Dynamic pointer arrow needle */}
-              <g transform="translate(100, 110)">
-                <line
+              <g transform="translate(120, 115)">
+                <motion.line
                   x1="0"
                   y1="0"
                   x2="0"
@@ -281,11 +301,12 @@ export default function FearGreedPanel() {
                   stroke="#FFFFFF"
                   strokeWidth="3"
                   strokeLinecap="round"
-                  transform={`rotate(${angle})`}
+                  animate={{ rotate: angle }}
+                  transition={{ type: 'spring', stiffness: 50, damping: 10 }}
                   style={{ transformOrigin: '0px 0px' }}
                   filter="url(#reactGlowEffect)"
                 />
-                <line
+                <motion.line
                   x1="0"
                   y1="-50"
                   x2="0"
@@ -293,7 +314,8 @@ export default function FearGreedPanel() {
                   stroke="#ef4444"
                   strokeWidth="1.5"
                   strokeLinecap="round"
-                  transform={`rotate(${angle})`}
+                  animate={{ rotate: angle }}
+                  transition={{ type: 'spring', stiffness: 50, damping: 10 }}
                   style={{ transformOrigin: '0px 0px' }}
                 />
                 <circle cx="0" cy="0" r="8" fill="#1e293b" stroke="#ffffff" strokeWidth="1.5" />
@@ -303,7 +325,7 @@ export default function FearGreedPanel() {
             </svg>
 
             {/* Float value */}
-            <div className="absolute bottom-1 bg-black/80 px-4 py-1.5 rounded border border-[#222] backdrop-blur-md">
+            <div className="absolute bottom-1 bg-black/95 px-5 py-1.5 rounded-sm border border-[#222f46] backdrop-blur-md shadow-lg">
               <motion.div 
                 className="text-4xl font-black font-mono tracking-tighter text-white"
                 initial={{ scale: 0.5, opacity: 0 }}
@@ -317,12 +339,12 @@ export default function FearGreedPanel() {
 
           <div className="mt-6 space-y-2 z-10 w-full">
             <span className={cn(
-              "text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-sm border inline-block",
+              "text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-sm border inline-block shadow-sm",
               currentMeta.bg, currentMeta.color, currentMeta.border
             )}>
               {currentMeta.label}
             </span>
-            <p className="text-xs text-gray-400 max-w-xs mx-auto leading-snug mt-1">
+            <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed mt-1">
               {currentMeta.desc}
             </p>
           </div>
