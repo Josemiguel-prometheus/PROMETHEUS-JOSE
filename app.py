@@ -571,104 +571,100 @@ elif menu == "Fear & Greed Index":
             # Formula: (index / 100) * 180 - 90
             angle_needle = (total_index / 100.0) * 180.0 - 90.0
             st.markdown(f"""
-            <div style="background-color: #0c0d12; border: 1px solid #1e293b; padding: 24px; border-radius: 8px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 320px; margin: 0 auto 15px; position: relative;">
-                <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f97316; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 15px; font-weight: bold; text-shadow: 0 0 10px rgba(249,115,22,0.2);">PROMETHEUS SENTIMENTAL CORE</span>
+            <div style="background-color: #090a0f; border: 1px solid #1e293b; padding: 24px; border-radius: 8px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5); max-width: 320px; margin: 0 auto 15px; position: relative;">
+                
+                <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 4px 10px; background-color: rgba(2, 6, 23, 0.9); border: 1px solid rgba(249, 115, 22, 0.3); border-radius: 4px;">
+                    <span style="display: inline-block; width: 6px; height: 6px; background-color: #f97316; border-radius: 50%;"></span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #f97316; letter-spacing: 1px; text-transform: uppercase; font-weight: 900; line-height: 1;">PROMETHEUS SENTIMENTAL CORE</span>
+                </div>
                 
                 <div style="width: 100%; max-width: 280px; margin: 0 auto; height: 175px; position: relative;">
                     <svg viewBox="0 0 240 145" style="width: 100%; height: 100%; overflow: visible;">
                         <defs>
                             <linearGradient id="cnnGlowPy" x1="0%" y1="0%" x2="100%" y2="0%">
                                 <stop offset="0%" stop-color="#ef4444" />
-                                <stop offset="25%" stop-color="#ef4444" />
-                                <stop offset="45%" stop-color="#f97316" />
-                                <stop offset="55%" stop-color="#eab308" />
+                                <stop offset="25%" stop-color="#f97316" />
+                                <stop offset="50%" stop-color="#eab308" />
                                 <stop offset="75%" stop-color="#10b981" />
                                 <stop offset="100%" stop-color="#22c55e" />
                             </linearGradient>
-                            <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
-                                <feGaussianBlur stdDeviation="3" result="blur" />
-                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                            </filter>
                         </defs>
 
                         <!-- Background subtle arc grid circles -->
-                        <path d="M 45 115 A 75 75 0 0 1 195 115" fill="none" stroke="#1c2538" stroke-width="1" stroke-dasharray="2,4" />
-                        <path d="M 25 115 A 95 95 0 0 1 215 115" fill="none" stroke="#161e2e" stroke-width="0.5" />
+                        <path d="M 45 115 A 75 75 0 0 1 195 115" fill="none" stroke="#161f30" stroke-width="1.5" stroke-dasharray="3,4" />
+                        <path d="M 25 115 A 95 95 0 0 1 215 115" fill="none" stroke="#0e1422" stroke-width="1" />
 
-                        <!-- Main colored meter arc -->
+                        <!-- Main background track arc -->
                         <path
                             d="M 35 115 A 85 85 0 0 1 205 115"
                             fill="none"
                             stroke="#161b26"
-                            stroke-width="16"
+                            stroke-width="18"
                             stroke-linecap="round"
                         />
                         <path
                             d="M 35 115 A 85 85 0 0 1 205 115"
                             fill="none"
                             stroke="url(#cnnGlowPy)"
-                            stroke-width="12"
+                            stroke-width="14"
                             stroke-linecap="round"
                             opacity="0.95"
                         />
 
-                        <!-- Ticks Group rotated from center (120, 115) -->
+                        <!-- Calibration Ticks rotated from center (120, 115) -->
                         <g transform="translate(120, 115)">
-                            <!-- Tick 0 rotated -90 deg -->
+                            <!-- Tick 0 -->
                             <g transform="rotate(-90)">
-                                <line x1="0" y1="-85" x2="0" y2="-95" stroke="#ef4444" stroke-width="3" />
+                                <line x1="0" y1="-85" x2="0" y2="-96" stroke="#ef4444" stroke-width="3" />
                             </g>
-                            <!-- Tick 25 rotated -45 deg -->
+                            <!-- Tick 25 -->
                             <g transform="rotate(-45)">
-                                <line x1="0" y1="-85" x2="0" y2="-93" stroke="#f97316" stroke-width="2" />
+                                <line x1="0" y1="-85" x2="0" y2="-94" stroke="#f97316" stroke-width="2.5" />
                             </g>
-                            <!-- Tick 50 rotated 0 deg -->
+                            <!-- Tick 50 -->
                             <g transform="rotate(0)">
-                                <line x1="0" y1="-85" x2="0" y2="-95" stroke="#eab308" stroke-width="2.5" />
+                                <line x1="0" y1="-85" x2="0" y2="-96" stroke="#eab308" stroke-width="3" />
                             </g>
-                            <!-- Tick 75 rotated 45 deg -->
+                            <!-- Tick 75 -->
                             <g transform="rotate(45)">
-                                <line x1="0" y1="-85" x2="0" y2="-93" stroke="#10b981" stroke-width="2" />
+                                <line x1="0" y1="-85" x2="0" y2="-94" stroke="#10b981" stroke-width="2.5" />
                             </g>
-                            <!-- Tick 100 rotated 90 deg -->
+                            <!-- Tick 100 -->
                             <g transform="rotate(90)">
-                                <line x1="0" y1="-85" x2="0" y2="-95" stroke="#22c55e" stroke-width="3" />
+                                <line x1="0" y1="-85" x2="0" y2="-96" stroke="#22c55e" stroke-width="3" />
                             </g>
                         </g>
 
-                        <!-- Ticks labels inside the SVG box, carefully adjusted -->
-                        <text x="20" y="123" fill="#f87171" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">0</text>
-                        <text x="50" y="55" fill="#fb923c" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">25</text>
-                        <text x="120" y="16" fill="#fef08a" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="bold" text-anchor="middle">50</text>
-                        <text x="190" y="55" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">75</text>
-                        <text x="220" y="123" fill="#4ade80" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold" text-anchor="middle">100</text>
+                        <!-- High-Contrast Bold Tick labels inside the SVG box -->
+                        <text x="18" y="125" fill="#f87171" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800" text-anchor="middle">0</text>
+                        <text x="50" y="52" fill="#fb923c" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800" text-anchor="middle">25</text>
+                        <text x="120" y="14" fill="#fef08a" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="900" text-anchor="middle">50</text>
+                        <text x="190" y="52" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800" text-anchor="middle">75</text>
+                        <text x="222" y="125" fill="#4ade80" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800" text-anchor="middle">100</text>
 
                         <!-- Pointer Needle rotating -->
-                        <g transform="translate(120, 115)">
+                        <g transform="translate(120, 115) rotate({angle_needle})">
                             <line
                                 x1="0"
                                 y1="0"
                                 x2="0"
-                                y2="-82"
+                                y2="-84"
                                 stroke="#ffffff"
-                                stroke-width="3"
+                                stroke-width="3.5"
                                 stroke-linecap="round"
-                                transform="rotate({angle_needle})"
-                                filter="url(#glowEffect)"
                             />
                             <line
                                 x1="0"
                                 y1="-50"
                                 x2="0"
-                                y2="-80"
+                                y2="-82"
                                 stroke="#ef4444"
                                 stroke-width="1.5"
                                 stroke-linecap="round"
-                                transform="rotate({angle_needle})"
                             />
-                            <circle cx="0" cy="0" r="8" fill="#1e293b" stroke="#ffffff" stroke-width="1.5" />
-                            <circle cx="0" cy="0" r="4.5" fill="#ef4444" />
-                            <circle cx="0" cy="0" r="2" fill="#000000" />
+                            <circle cx="0" cy="0" r="10" fill="#1e293b" stroke="#ffffff" stroke-width="2" />
+                            <circle cx="0" cy="0" r="5" fill="#ef4444" />
+                            <circle cx="0" cy="0" r="2.5" fill="#000000" />
                         </g>
                     </svg>
 

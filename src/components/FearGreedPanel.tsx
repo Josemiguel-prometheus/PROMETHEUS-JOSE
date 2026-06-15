@@ -211,140 +211,125 @@ export default function FearGreedPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
         
         {/* Left Side: Semi-circle Gauge */}
-        <div className="lg:col-span-5 bg-[#0c0d12] border border-[#1e293b] p-8 rounded-sm flex flex-col items-center justify-center text-center relative overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#111_1px,transparent_1px),linear-gradient(to_bottom,#111_1px,transparent_1px)] bg-[size:16px_16px] opacity-20 pointer-events-none" />
+        <div className="lg:col-span-5 bg-[#090a0f] border border-[#1e293b] p-8 rounded flex flex-col items-center justify-center text-center relative overflow-hidden shadow-[0_4px_30px_rgba(0,0,0,0.8)]">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#111_1px,transparent_1px),linear-gradient(to_bottom,#111_1px,transparent_1px)] bg-[size:16px_16px] opacity-10 pointer-events-none" />
           
-          <span className="text-[11px] uppercase font-mono tracking-widest text-[#64748b] mb-4 flex items-center gap-1.5 font-bold">
-            <Cpu className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
-            PROMETHEUS SENTIMENTAL CORE
-          </span>
+          <div className="flex items-center gap-2 mb-6 z-10 px-4 py-1.5 bg-slate-950/90 rounded border border-orange-500/30">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            <span className="text-[12px] font-mono font-black uppercase tracking-wider text-orange-400">
+              PROMETHEUS SENTIMENTAL CORE
+            </span>
+          </div>
 
-          {/* SVG Gauge */}
+          {/* SVG Gauge - Pristine, Simple, Scale-Independent, Solid Contrast */}
           <div className="relative w-full max-w-[280px] h-48 flex items-center justify-center mt-2">
             <svg className="w-full h-full overflow-visible" viewBox="0 0 240 145">
               <defs>
                 <linearGradient id="cnnGlow" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#ef4444" />
-                  <stop offset="25%" stopColor="#ef4444" />
-                  <stop offset="45%" stopColor="#f97316" />
-                  <stop offset="55%" stopColor="#eab308" />
+                  <stop offset="25%" stopColor="#f97316" />
+                  <stop offset="50%" stopColor="#eab308" />
                   <stop offset="75%" stopColor="#10b981" />
                   <stop offset="100%" stopColor="#22c55e" />
                 </linearGradient>
-                <filter id="reactGlowEffect" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="2.5" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
               </defs>
 
-              {/* Background subtle arc grid circles */}
-              <path d="M 45 115 A 75 75 0 0 1 195 115" fill="none" stroke="#1c2538" strokeWidth="1" strokeDasharray="2,4" />
-              <path d="M 25 115 A 95 95 0 0 1 215 115" fill="none" stroke="#161e2e" strokeWidth="0.5" />
+              {/* Background circular guide paths */}
+              <path d="M 45 115 A 75 75 0 0 1 195 115" fill="none" stroke="#161f30" strokeWidth="1.5" strokeDasharray="3,4" />
+              <path d="M 25 115 A 95 95 0 0 1 215 115" fill="none" stroke="#0e1422" strokeWidth="1" />
 
-              {/* Base grey background arc */}
+              {/* Base dark groove background arc */}
               <path
                 d="M 35 115 A 85 85 0 0 1 205 115"
                 fill="none"
                 stroke="#161b26"
-                strokeWidth="16"
+                strokeWidth="18"
                 strokeLinecap="round"
               />
 
-              {/* Colored active gradient arc */}
+              {/* Active color ribbon arc */}
               <path
                 d="M 35 115 A 85 85 0 0 1 205 115"
                 fill="none"
                 stroke="url(#cnnGlow)"
-                strokeWidth="12"
+                strokeWidth="14"
                 strokeLinecap="round"
                 opacity="0.95"
               />
 
-              {/* Ticks Group rotated from center (120, 115) */}
+              {/* Calibration Tick Marks */}
               <g transform="translate(120, 115)">
-                {/* Tick 0 (Miedo Extremo) rotated -90 deg */}
+                {/* 0 Tick */}
                 <g transform="rotate(-90)">
-                  <line x1="0" y1="-85" x2="0" y2="-95" stroke="#ef4444" strokeWidth="3" />
+                  <line x1="0" y1="-85" x2="0" y2="-96" stroke="#ef4444" strokeWidth="3" />
                 </g>
-                {/* Tick 25 (Miedo) rotated -45 deg */}
+                {/* 25 Tick */}
                 <g transform="rotate(-45)">
-                  <line x1="0" y1="-85" x2="0" y2="-93" stroke="#f97316" strokeWidth="2" />
+                  <line x1="0" y1="-85" x2="0" y2="-94" stroke="#f97316" strokeWidth="2.5" />
                 </g>
-                {/* Tick 50 (Neutral) rotated 0 deg */}
+                {/* 50 Tick */}
                 <g transform="rotate(0)">
-                  <line x1="0" y1="-85" x2="0" y2="-95" stroke="#eab308" strokeWidth="2.5" />
+                  <line x1="0" y1="-85" x2="0" y2="-96" stroke="#eab308" strokeWidth="3" />
                 </g>
-                {/* Tick 75 (Codicia) rotated 45 deg */}
+                {/* 75 Tick */}
                 <g transform="rotate(45)">
-                  <line x1="0" y1="-85" x2="0" y2="-93" stroke="#10b981" strokeWidth="2" />
+                  <line x1="0" y1="-85" x2="0" y2="-94" stroke="#10b981" strokeWidth="2.5" />
                 </g>
-                {/* Tick 100 (Codicia Extrema) rotated 90 deg */}
+                {/* 100 Tick */}
                 <g transform="rotate(90)">
-                  <line x1="0" y1="-85" x2="0" y2="-95" stroke="#22c55e" strokeWidth="3" />
+                  <line x1="0" y1="-85" x2="0" y2="-96" stroke="#22c55e" strokeWidth="3" />
                 </g>
               </g>
 
-              {/* Tick Labels - positioned with absolute clarity to prevent clipping */}
-              <text x="20" y="123" fill="#f87171" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">0</text>
-              <text x="50" y="55" fill="#fb923c" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">25</text>
-              <text x="120" y="16" fill="#fef08a" fontFamily="'JetBrains Mono', monospace" fontSize="11" fontWeight="bold" textAnchor="middle">50</text>
-              <text x="190" y="55" fill="#34d399" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">75</text>
-              <text x="220" y="123" fill="#4ade80" fontFamily="'JetBrains Mono', monospace" fontSize="10" fontWeight="bold" textAnchor="middle">100</text>
+              {/* Bold High-Contrast Text Labels */}
+              <text x="18" y="125" fill="#f87171" fontFamily="'JetBrains Mono', monospace" fontSize="12" fontWeight="800" textAnchor="middle">0</text>
+              <text x="50" y="52" fill="#fb923c" fontFamily="'JetBrains Mono', monospace" fontSize="12" fontWeight="800" textAnchor="middle">25</text>
+              <text x="120" y="14" fill="#fef08a" fontFamily="'JetBrains Mono', monospace" fontSize="13" fontWeight="900" textAnchor="middle">50</text>
+              <text x="190" y="52" fill="#34d399" fontFamily="'JetBrains Mono', monospace" fontSize="12" fontWeight="800" textAnchor="middle">75</text>
+              <text x="222" y="125" fill="#4ade80" fontFamily="'JetBrains Mono', monospace" fontSize="12" fontWeight="800" textAnchor="middle">100</text>
 
-              {/* Dynamic pointer arrow needle */}
-              <g transform="translate(120, 115)">
-                <motion.line
+              {/* Robust pointer needle - uses pure JSX transform rotation for bulletproof layout */}
+              <g transform={`translate(120, 115) rotate(${angle})`}>
+                <line
                   x1="0"
                   y1="0"
                   x2="0"
-                  y2="-82"
+                  y2="-84"
                   stroke="#FFFFFF"
-                  strokeWidth="3"
+                  strokeWidth="3.5"
                   strokeLinecap="round"
-                  animate={{ rotate: angle }}
-                  transition={{ type: 'spring', stiffness: 50, damping: 10 }}
-                  style={{ transformOrigin: '0px 0px' }}
-                  filter="url(#reactGlowEffect)"
                 />
-                <motion.line
+                <line
                   x1="0"
                   y1="-50"
                   x2="0"
-                  y2="-80"
+                  y2="-82"
                   stroke="#ef4444"
                   strokeWidth="1.5"
                   strokeLinecap="round"
-                  animate={{ rotate: angle }}
-                  transition={{ type: 'spring', stiffness: 50, damping: 10 }}
-                  style={{ transformOrigin: '0px 0px' }}
                 />
-                <circle cx="0" cy="0" r="8" fill="#1e293b" stroke="#ffffff" strokeWidth="1.5" />
-                <circle cx="0" cy="0" r="4.5" fill="#ef4444" />
-                <circle cx="0" cy="0" r="2" fill="#000000" />
+                <circle cx="0" cy="0" r="10" fill="#1e293b" stroke="#ffffff" strokeWidth="2" />
+                <circle cx="0" cy="0" r="5" fill="#ef4444" />
+                <circle cx="0" cy="0" r="2.5" fill="#000000" />
               </g>
             </svg>
 
-            {/* Float value */}
-            <div className="absolute bottom-1 bg-black/95 px-5 py-1.5 rounded-sm border border-[#222f46] backdrop-blur-md shadow-lg">
-              <motion.div 
-                className="text-4xl font-black font-mono tracking-tighter text-white"
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                key={indexVal}
-              >
+            {/* Absolute digital read box below */}
+            <div className="absolute bottom-1 bg-black border border-[#222f46] px-5 py-1.5 rounded shadow-xl">
+              <span className="text-4xl font-black font-mono tracking-tight text-white select-none">
                 {indexVal}
-              </motion.div>
+              </span>
             </div>
           </div>
 
           <div className="mt-6 space-y-2 z-10 w-full">
             <span className={cn(
-              "text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-sm border inline-block shadow-sm",
+              "text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded border inline-block",
               currentMeta.bg, currentMeta.color, currentMeta.border
             )}>
               {currentMeta.label}
             </span>
-            <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed mt-1">
+            <p className="text-xs text-slate-300 max-w-xs mx-auto leading-relaxed mt-1 font-medium">
               {currentMeta.desc}
             </p>
           </div>
