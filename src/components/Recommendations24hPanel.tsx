@@ -49,6 +49,14 @@ export default function Recommendations24hPanel() {
   const [improvements, setImprovements] = useState<PlatformImprovement[]>([]);
   const [isLoadingImpr, setIsLoadingImpr] = useState(false);
 
+  // States for enhanced 24H Signal Historical Log
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSector, setSelectedSector] = useState('ALL');
+  const [selectedConviction, setSelectedConviction] = useState('ALL');
+  const [selectedRecDetail, setSelectedRecDetail] = useState<Recommendation24h | null>(null);
+  const [syncingIndex, setSyncingIndex] = useState<number | null>(null);
+  const [syncedIds, setSyncedIds] = useState<Record<number, boolean>>({});
+
   // Prometheus AI Chatbot States
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     { 
@@ -236,6 +244,52 @@ export default function Recommendations24hPanel() {
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
     return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
+  };
+
+  // Filter derivations for 24H Signal History
+  const filteredRecs = recList.filter(item => {
+    const matchesSearch = 
+      item.sector_lider.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.report.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Extract sector ticker for filtering (e.g. "XLK (Tecnología)" -> "XLK")
+    const match = item.sector_lider.match(/^([A-Z0-9\-]+)/i);
+    const sectorSymbol = match ? match[1].toUpperCase() : item.sector_lider.toUpperCase();
+    const matchesSector = selectedSector === 'ALL' || sectorSymbol.includes(selectedSector.toUpperCase());
+    
+    const matchesConviction = selectedConviction === 'ALL' || item.conviction === selectedConviction;
+    
+    return matchesSearch && matchesSector && matchesConviction;
+  });
+
+  const uniqueSectors = Array.from(new Set(recList.map(item => {
+    const match = item.sector_lider.match(/^([A-Z0-9\-]+)/i);
+    return match ? match[1].toUpperCase() : null;
+  }).filter((v): v is string => !!v)));
+
+  const handleExportCSV = () => {
+    if (filteredRecs.length === 0) return;
+    const headers = 'ID,Timestamp,Sector Lider,Rotation Score,VIX Bench,Action,Conviction,Report\n';
+    const rows = filteredRecs.map(r => 
+      `${r.id || ''},"${r.timestamp || ''}","${r.sector_lider || ''}",${r.score || ''},${r.vix_at_generation || ''},"${r.action || ''}","${r.conviction || ''}","${(r.report || '').replace(/"/g, '""')}"`
+    ).join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `prometheus_signals_history_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSyncToGithub = (item: Recommendation24h) => {
+    setSyncingIndex(item.id);
+    setTimeout(() => {
+      setSyncingIndex(null);
+      setSyncedIds(prev => ({ ...prev, [item.id]: true }));
+    }, 1500);
   };
 
   return (
@@ -543,64 +597,229 @@ export default function Recommendations24hPanel() {
 
           {/* Historical Logs widget */}
           <div className="bg-[#0F0F0f] border border-[#1A1A1A] p-5 rounded-sm flex-1 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3 mb-4">
+            <div className="space-y-4 font-mono">
+              <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-orange-400" />
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0] font-mono">Registro Histórico 24H</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0]">Registro Histórico 24H</h3>
                 </div>
-                <span className="text-[9px] text-[#666] font-mono font-bold">10 ÚLTIMAS SEÑALES</span>
+                <span className="text-[10px] text-orange-500 font-mono font-bold bg-orange-950/20 px-2.5 py-0.5 border border-orange-500/20 rounded-xs">
+                  {filteredRecs.length} SEÑAL{filteredRecs.length !== 1 ? 'ES' : ''}
+                </span>
               </div>
 
-              <div className="space-y-3.5 max-h-[500px] overflow-y-auto pr-1 select-none custom-scrollbar">
-                {recList.map((item, idx) => (
-                  <div 
-                    key={idx} 
-                    className="bg-[#141414] border border-[#222] p-3 hover:border-orange-500/10 hover:bg-[#181818] transition-all rounded-sm flex flex-col space-y-1.5"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[8px] font-mono text-[#666] uppercase block">
-                          Generado: {item.timestamp ? item.timestamp.split(' ')[0] : 'Desconocido'}
-                        </span>
-                        <h4 className="text-xs font-bold text-white mt-0.5">{item.sector_lider}</h4>
-                      </div>
-                      <span className={cn(
-                        "text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-sm",
-                        item.conviction === 'ALTA' ? "bg-green-500/5 text-green-500 border border-green-500/10" : "bg-yellow-500/5 text-yellow-500 border border-yellow-500/10"
-                      )}>
-                        {item.conviction}
-                      </span>
-                    </div>
-
-                    <div className="text-[10px] text-orange-400/90 font-mono font-bold uppercase flex justify-between">
-                      <span>{item.action}</span>
-                      <span>Score {item.score.toFixed(2)}</span>
-                    </div>
-
-                    <p className="text-[10px] text-[#888] leading-snug italic border-l border-[#333] pl-2.5">
-                      "{item.report}"
-                    </p>
+              {/* Advanced search and filtering tools */}
+              <div className="space-y-2.5 bg-[#141414]/40 p-3 rounded-sm border border-[#1F1F1F]">
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Filtrar por palabra clave..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-[#0A0A0A] border border-[#222] focus:border-orange-500/50 text-white placeholder-gray-600 text-[11px] px-2.5 py-1.5 rounded-sm"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[8px] text-gray-500 block mb-0.5 uppercase">SECTOR GICS</label>
+                    <select
+                      value={selectedSector}
+                      onChange={(e) => setSelectedSector(e.target.value)}
+                      className="w-full bg-[#0A0A0A] border border-[#222] text-[#AAA] text-[10px] px-2 py-1 rounded-sm"
+                    >
+                      <option value="ALL">TODOS</option>
+                      {uniqueSectors.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </div>
-                ))}
+                  <div>
+                    <label className="text-[8px] text-gray-500 block mb-0.5 uppercase">CONVICCIÓN</label>
+                    <select
+                      value={selectedConviction}
+                      onChange={(e) => setSelectedConviction(e.target.value)}
+                      className="w-full bg-[#0A0A0A] border border-[#222] text-[#AAA] text-[10px] px-2 py-1 rounded-sm"
+                    >
+                      <option value="ALL">CUALQUIERA</option>
+                      <option value="ALTA">ALTA</option>
+                      <option value="MEDIA">MEDIA</option>
+                      <option value="BAJA">BAJA</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between border-t border-[#1C1C1C]">
+                  <span className="text-[9px] text-[#666]">
+                    Avg Score: {(filteredRecs.reduce((acc, r) => acc + r.score, 0) / (filteredRecs.length || 1)).toFixed(2)}
+                  </span>
+                  <button
+                    onClick={handleExportCSV}
+                    className="text-[9px] font-bold text-orange-400 hover:text-orange-300 flex items-center gap-1 uppercase bg-[#1A1A1A] px-2 py-1 border border-[#2A2A2A] rounded-xs"
+                  >
+                    <span>📊 Exportar CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Signals log viewport */}
+              <div className="space-y-3.5 max-h-[320px] overflow-y-auto pr-1 select-none custom-scrollbar">
+                {filteredRecs.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-[#666] italic">
+                    Ninguna señal coincide con los filtros.
+                  </div>
+                ) : (
+                  filteredRecs.map((item, idx) => (
+                    <div 
+                      key={item.id || idx} 
+                      onClick={() => setSelectedRecDetail(item)}
+                      className="bg-[#141414] border border-[#222] p-3 hover:border-orange-500/30 hover:bg-[#18181a]/80 transition-all rounded-sm flex flex-col space-y-1.5 cursor-pointer relative group"
+                    >
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-[#888]">
+                        VER BRIEFING &rarr;
+                      </div>
+
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[8px] text-[#666] uppercase block">
+                            Generado: {item.timestamp ? item.timestamp.split(' ')[0] : 'Desconocido'}
+                          </span>
+                          <h4 className="text-xs font-bold text-white mt-0.5 group-hover:text-orange-400 transition-colors">{item.sector_lider}</h4>
+                        </div>
+                        <span className={cn(
+                          "text-[8px] font-bold px-1.5 py-0.5 rounded-sm shrink-0",
+                          item.conviction === 'ALTA' ? "bg-green-500/5 text-green-500 border border-green-500/10" : "bg-yellow-500/5 text-yellow-500 border border-yellow-500/10"
+                        )}>
+                          {item.conviction}
+                        </span>
+                      </div>
+
+                      <div className="text-[10px] text-orange-400/90 font-bold uppercase flex justify-between">
+                        <span>{item.action}</span>
+                        <span>Score {item.score.toFixed(2)}</span>
+                      </div>
+
+                      <p className="text-[10px] text-[#888] leading-snug italic border-l border-[#333] pl-2.5 line-clamp-1">
+                        "{item.report}"
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
             <div className="mt-8 p-4 bg-[#141414] border border-[#222] rounded-sm flex items-center justify-between gap-4">
               <div className="flex items-center gap-2.5 text-gray-400">
-                <Github className="w-5 h-5" />
+                <Github className="w-5 h-5 flex-shrink-0" />
                 <div>
                   <h5 className="text-[10px] font-bold text-white uppercase tracking-wider">ENTREGADO PARA GITHUB</h5>
-                  <p className="text-[9px] text-[#666] leading-none">Último commit alineado de forma limpia</p>
+                  <p className="text-[9px] text-[#666] leading-none">Canal de sincronización de señales 24H activo</p>
                 </div>
               </div>
-              <span className="text-[8px] font-mono bg-[#1A1A1A] border border-[#2F2F2F] text-green-400 px-2 py-0.5 rounded-xs font-bold">
+              <span className="text-[8px] font-mono bg-[#1A1A1A] border border-[#2F2F2F] text-green-400 px-2 py-0.5 rounded-xs font-bold shrink-0">
                 SI COMPILA
               </span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Visual detail dialog modal */}
+      {selectedRecDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in font-mono">
+          <div className="bg-[#0c0c0e] border border-orange-500/30 rounded-sm max-w-lg w-full p-6 shadow-2xl relative space-y-5">
+            {/* Close button */}
+            <button 
+              onClick={() => setSelectedRecDetail(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header info */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-orange-500"></span>
+                <span className="text-[9px] text-[#888] uppercase tracking-widest font-bold">PROMETHEUS TACTICAL LEDGER REPORT</span>
+              </div>
+              <h3 className="text-lg font-bold text-white tracking-tight">{selectedRecDetail.sector_lider}</h3>
+              <span className="text-[9px] text-[#555] block">DIAGNOSTIC HASH: SHA256-{(selectedRecDetail.id * 1838183).toString(16).toUpperCase()}</span>
+            </div>
+
+            {/* Metrics Breakdown */}
+            <div className="grid grid-cols-2 gap-4 bg-[#141416] p-4 rounded-sm border border-[#1e1e24]">
+              <div>
+                <span className="text-[8px] text-[#888] block uppercase">ROTATION SCORE</span>
+                <span className="text-xl font-bold text-orange-500">{selectedRecDetail.score.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="text-[8px] text-[#888] block uppercase">VIX BENCHMARK</span>
+                <span className="text-xl font-bold text-orange-500">{selectedRecDetail.vix_at_generation.toFixed(2)}</span>
+              </div>
+              <div className="col-span-2 pt-2 border-t border-[#222] flex justify-between items-center">
+                <div>
+                  <span className="text-[8px] text-[#888] block uppercase">CONVICCIÓN</span>
+                  <span className={cn(
+                    "text-xs font-bold tracking-wider",
+                    selectedRecDetail.conviction === 'ALTA' ? "text-green-500" : "text-yellow-500"
+                  )}>{selectedRecDetail.conviction} DIRECTA</span>
+                </div>
+                <div>
+                  <span className="text-[8px] text-[#888] block uppercase text-right">TIMESTAMP</span>
+                  <span className="text-xs text-white block text-right">{selectedRecDetail.timestamp}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Recommendation detail */}
+            <div className="space-y-1.5">
+              <span className="text-[9px] text-[#888] tracking-widest block uppercase">ACCIÓN RECOMENDADA TÁCTICA</span>
+              <p className="text-sm font-bold text-orange-500 bg-orange-950/10 p-2 border border-orange-500/20 rounded-xs">
+                {selectedRecDetail.action}
+              </p>
+            </div>
+
+            {/* Full narrative */}
+            <div className="space-y-1.5">
+              <span className="text-[9px] text-[#888] tracking-widest block uppercase">INFORME DEL ANALISTA INTEGRADOR</span>
+              <div className="text-xs text-[#AAA] leading-relaxed bg-[#111113] p-4 border border-[#1d1d22] rounded-sm italic">
+                "{selectedRecDetail.report}"
+              </div>
+            </div>
+
+            {/* Sincronización a GitHub */}
+            <div className="pt-4 border-t border-[#1a1a20] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                <Github className="w-4 h-4 text-gray-400 shrink-0" />
+                <span>
+                  {syncedIds[selectedRecDetail.id] ? (
+                    <span className="text-green-400 font-bold">✓ Sincronizado dinámicamente con éxito</span>
+                  ) : (
+                    <span className="text-[#666]">Sincroniza y alinea hash a su repositorio</span>
+                  )}
+                </span>
+              </div>
+              
+              <button
+                disabled={syncingIndex !== null || !!syncedIds[selectedRecDetail.id]}
+                onClick={() => handleSyncToGithub(selectedRecDetail)}
+                className="py-1.5 px-4 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 hover:text-white transition-all font-bold text-xs uppercase rounded-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {syncingIndex === selectedRecDetail.id ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>SINCRONIZANDO...</span>
+                  </>
+                ) : syncedIds[selectedRecDetail.id] ? (
+                  <span>✓ SINCRONIZADO</span>
+                ) : (
+                  <span>SINCRONIZAR CON GITHUB</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

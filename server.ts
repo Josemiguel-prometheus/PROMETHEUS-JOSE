@@ -334,14 +334,14 @@ async function startServer() {
       if (shouldGenerate) {
         const generated = await generateDailyRecommendation();
         if (generated) {
-          const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 10');
+          const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 100');
           const nextUpdate = new Date(generated.timestamp).getTime() + (24 * 60 * 60 * 1000);
           const countdownSeconds = Math.max(0, Math.floor((nextUpdate - Date.now()) / 1000));
           return res.json({ list, countdownSeconds, current: generated });
         }
       }
 
-      const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 10');
+      const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 100');
       const current = latest || list[0];
       const nextUpdate = new Date(current.timestamp).getTime() + (24 * 60 * 60 * 1000);
       const countdownSeconds = Math.max(0, Math.floor((nextUpdate - Date.now()) / 1000));
@@ -356,7 +356,7 @@ async function startServer() {
   app.post('/api/recommendations/24h/generate', async (req, res) => {
     try {
       const generated = await generateDailyRecommendation();
-      const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 10');
+      const list = await db.all('SELECT * FROM recommendations_24h ORDER BY timestamp DESC LIMIT 100');
       const nextUpdate = new Date(generated!.timestamp).getTime() + (24 * 60 * 60 * 1000);
       const countdownSeconds = Math.max(0, Math.floor((nextUpdate - Date.now()) / 1000));
       res.json({ success: true, list, countdownSeconds, current: generated });
