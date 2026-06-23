@@ -228,12 +228,12 @@ export default function Dashboard() {
               </div>
               <SentimentGauge value={sentimentValue} />
               <div className="hidden sm:block">
-                <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest mb-1">💡 SEÑAL 30D EN CORE</p>
+                <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest mb-1">💡 SEÑAL SYSTEM CORE</p>
                 <p className="text-sm font-bold text-white uppercase italic">
-                   {recCurrent ? `"${recCurrent.action}"` : '"HEDGING STRATEGICALLY REQUIRED"'}
+                   "SOBREPONDERAR TÁCTICAMENTE XLK"
                 </p>
                 <p className="text-[9px] font-mono text-green-500 font-bold uppercase mt-1">
-                   Líder: {recCurrent ? recCurrent.sector_lider.split(' ')[0] : 'XLK'} (Score {recCurrent ? recCurrent.score : '3.84'})
+                   Líder: XLK (Score 4.25)
                 </p>
               </div>
             </div>
@@ -307,88 +307,6 @@ export default function Dashboard() {
         {/* Right Col: Agent Commentary Stack + 24H Recommendation Panel */}
         <div className="space-y-6">
           
-          {/* 30D Recommendation Panel */}
-          <div className="bg-[#0f0f15] border border-purple-500/20 p-5 rounded-sm space-y-4 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-[50px] -mr-16 -mt-16 transition-all group-hover:bg-purple-500/10"></div>
-            
-            <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-purple-400" />
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0]">SISTEMA DE ASIGNACIÓN 30D</h3>
-              </div>
-              <span className="text-[9px] font-mono bg-purple-500/10 border border-purple-500/20 text-purple-400 px-2 py-0.5 rounded-sm">
-                Siguiente en: {formatCountdown(countdown)}
-              </span>
-            </div>
-
-            {recCurrent ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-[#666] uppercase">SECTOR ACCIÓN</span>
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-sm text-[9px] font-bold font-mono border",
-                    recCurrent.conviction === 'ALTA' ? "text-green-500 border-green-500/20 bg-green-500/5" : "text-yellow-500 border-yellow-500/20 bg-yellow-500/5"
-                  )}>
-                    CONVICCIÓN {recCurrent.conviction}
-                  </span>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-bold text-white tracking-tight">{recCurrent.sector_lider}</h4>
-                  <p className="text-xs font-mono font-bold text-orange-500 uppercase mt-0.5">{recCurrent.action}</p>
-                </div>
-
-                <p className="text-xs text-[#AAA] leading-relaxed italic border-l-2 border-purple-500/30 pl-3 py-0.5">
-                  "{recCurrent.report}"
-                </p>
-
-                <div className="text-[9px] font-mono text-[#444] flex justify-between">
-                  <span>VIX de Cálculo: {recCurrent.vix_at_generation.toFixed(2)}</span>
-                  <span>Generado: {recCurrent.timestamp ? recCurrent.timestamp.substring(0, 16) : 'Hoy'}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="h-24 flex items-center justify-center animate-pulse">
-                <span className="text-xs text-[#666]">Sincronizando Recomendación 30D...</span>
-              </div>
-            )}
-
-            <div className="flex gap-2 pt-2">
-              <button 
-                onClick={() => setShowRecHistory(!showRecHistory)}
-                className="flex-1 py-1.5 bg-[#141414] border border-[#2A2A2A] hover:bg-[#1C1C1C] text-[10px] font-bold uppercase tracking-widest text-[#AAA] transition-all"
-              >
-                {showRecHistory ? 'Ocultar Historial 30D' : 'Historial 30D'}
-              </button>
-              <button 
-                onClick={force24hRec}
-                disabled={isForcingRec}
-                className={cn(
-                  "px-3 py-1.5 bg-purple-900/40 hover:bg-purple-800 border border-purple-500/30 text-purple-300 hover:text-white transition-all rounded-sm text-[10px] font-bold uppercase tracking-widest disabled:opacity-50",
-                  isForcingRec && "animate-pulse"
-                )}
-              >
-                {isForcingRec ? 'CALCULANDO...' : 'FORZAR'}
-              </button>
-            </div>
-
-            {/* Historical list dropdown */}
-            {showRecHistory && (
-              <div className="border-t border-[#1A1A1A]/60 pt-3 max-h-44 overflow-y-auto space-y-2.5 custom-scrollbar">
-                {recList.filter(item => item.id !== recCurrent?.id).map((item, idx) => (
-                  <div key={idx} className="bg-[#141414]/40 border border-[#222] p-2 text-xs hover:bg-[#141414]/80 transition-colors">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-[#E4E3E0]">{item.sector_lider}</span>
-                      <span className="text-[9px] font-mono text-[#555]">{item.timestamp ? item.timestamp.split(' ')[0] : ''}</span>
-                    </div>
-                    <p className="text-[10px] text-orange-500/80 font-bold font-mono">{item.action}</p>
-                    <p className="text-[10px] text-[#888] leading-snug mt-0.5">{item.report}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           <div className="flex items-center justify-between px-1">
             <h3 className="text-[10px] font-bold text-[#666] uppercase tracking-widest">FEED DE AGENTES (GENESIS)</h3>
             <div className="flex gap-1">

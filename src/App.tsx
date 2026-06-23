@@ -26,14 +26,12 @@ import SupervisorPanel from './components/SupervisorPanel';
 import HistoryPanel from './components/HistoryPanel';
 import ConfigPanel from './components/ConfigPanel';
 import DevilAdvocatePanel from './components/DevilAdvocatePanel';
-import Recommendations24hPanel from './components/Recommendations24hPanel';
 import DataManagementPanel from './components/DataManagementPanel';
 import GlobalLiquidityPanel from './components/GlobalLiquidityPanel';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
   { id: 'global_liquidity', label: 'Índice de Liquidez Global', icon: Globe },
-  { id: 'recommendations24h', label: '💡 Señales 30D & Mejoras', icon: Clock },
   { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
   { id: 'agents', label: 'Pentágono de Agentes', icon: Users },
@@ -142,7 +140,6 @@ export default function App() {
             >
               {activeTab === 'dashboard' && <Dashboard />}
               {activeTab === 'global_liquidity' && <GlobalLiquidityPanel />}
-              {activeTab === 'recommendations24h' && <Recommendations24hPanel />}
               {activeTab === 'rotations' && <RotationsPanel />}
               {activeTab === 'quotes' && <RealTimeQuotes />}
               {activeTab === 'agents' && <AgentsPanel />}
