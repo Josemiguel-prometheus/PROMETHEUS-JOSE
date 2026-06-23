@@ -101,64 +101,6 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [sentimentValue] = useState(72); 
 
-  // 30D Recommendations states
-  const [recList, setRecList] = useState<any[]>([]);
-  const [recCurrent, setRecCurrent] = useState<any>(null);
-  const [countdown, setCountdown] = useState<number>(2592000);
-  const [showRecHistory, setShowRecHistory] = useState(false);
-  const [isForcingRec, setIsForcingRec] = useState(false);
-
-  const fetch24hRecs = async () => {
-    try {
-      const res = await fetch('/api/recommendations/24h');
-      const data = await res.json();
-      setRecList(data.list || []);
-      setRecCurrent(data.current || null);
-      setCountdown(data.countdownSeconds || 2592000);
-    } catch (e) {
-      console.error('Error fetching 30D recommendations:', e);
-    }
-  };
-
-  const force24hRec = async () => {
-    setIsForcingRec(true);
-    try {
-      const res = await fetch('/api/recommendations/24h/generate', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        setRecList(data.list || []);
-        setRecCurrent(data.current || null);
-        setCountdown(data.countdownSeconds || 2592000);
-      }
-    } catch (e) {
-      console.error('Error forcing 30D recommendations:', e);
-    } finally {
-      setIsForcingRec(false);
-    }
-  };
-
-  useEffect(() => {
-    fetch24hRecs();
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown(prev => (prev > 0 ? prev - 1 : 2592000));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatCountdown = (sec: number) => {
-    const d = Math.floor(sec / (3600 * 24));
-    const h = Math.floor((sec % (3600 * 24)) / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-    if (d > 0) {
-      return `${d}d ${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`;
-    }
-    return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
-  };
-
   useEffect(() => {
     const fetchData = async () => {
       try {
