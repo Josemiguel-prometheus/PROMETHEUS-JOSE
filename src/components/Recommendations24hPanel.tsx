@@ -57,12 +57,14 @@ export default function Recommendations24hPanel() {
   const [selectedRecDetail, setSelectedRecDetail] = useState<Recommendation24h | null>(null);
   const [syncingIndex, setSyncingIndex] = useState<number | null>(null);
   const [syncedIds, setSyncedIds] = useState<Record<number, boolean>>({});
+  const [syncingImprId, setSyncingImprId] = useState<number | null>(null);
+  const [syncedImprIds, setSyncedImprIds] = useState<Record<number, boolean>>({});
 
   // Prometheus AI Chatbot States
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     { 
       role: 'assistant', 
-      content: '¡Hola! Soy **Prometheus IA**, tu asesor macroeconómico y experto en la plataforma. Estoy conectado en tiempo real al backlog de mejoras, histórico de señales 24h y GICS rotations. ¿Qué escenario macroeconómico o propuesta técnica deseas validar?' 
+      content: '¡Hola! Soy **Prometheus IA**, tu asesor macroeconómico y experto en la plataforma. Estoy conectado en tiempo real al backlog de mejoras, histórico de señales 30D y GICS rotations. ¿Qué escenario macroeconómico o propuesta técnica deseas validar?' 
     }
   ]);
   const [chatInput, setChatInput] = useState('');
@@ -294,6 +296,14 @@ export default function Recommendations24hPanel() {
     setTimeout(() => {
       setSyncingIndex(null);
       setSyncedIds(prev => ({ ...prev, [item.id]: true }));
+    }, 1500);
+  };
+
+  const handleSyncImprToGithub = (id: number) => {
+    setSyncingImprId(id);
+    setTimeout(() => {
+      setSyncingImprId(null);
+      setSyncedImprIds(prev => ({ ...prev, [id]: true }));
     }, 1500);
   };
 
@@ -579,13 +589,30 @@ export default function Recommendations24hPanel() {
                             <span className="text-[8px] font-mono text-[#444]">Hito: {imp.github_milestone}</span>
                           </div>
 
-                          <button
-                            onClick={() => handleVote(imp.id)}
-                            className="flex items-center gap-1.5 bg-[#1C1C1C] hover:bg-purple-500/10 hover:text-purple-300 border border-[#2C2C2C] hover:border-purple-500/30 text-xs text-[#AAA] px-3 py-1.5 transition-all rounded-sm font-mono font-bold"
-                          >
-                            <ThumbsUp className="w-3 h-3" />
-                            <span>Votos: {imp.votes}</span>
-                          </button>
+                           <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleVote(imp.id)}
+                              className="flex items-center gap-1.5 bg-[#1C1C1C] hover:bg-purple-500/10 hover:text-purple-300 border border-[#2C2C2C] hover:border-purple-500/30 text-xs text-[#AAA] px-3 py-1.5 transition-all rounded-sm font-mono font-bold"
+                            >
+                              <ThumbsUp className="w-3 h-3" />
+                              <span>Votos: {imp.votes}</span>
+                            </button>
+
+                            <button
+                              disabled={syncingImprId !== null || !!syncedImprIds[imp.id]}
+                              onClick={() => handleSyncImprToGithub(imp.id)}
+                              className="flex items-center gap-1.5 bg-purple-950/20 hover:bg-purple-950/40 text-purple-300 hover:text-white border border-purple-500/20 hover:border-purple-500/40 text-xs px-3 py-1.5 transition-all rounded-sm font-mono font-bold disabled:opacity-50"
+                            >
+                              <Github className="w-3 h-3" />
+                              {syncingImprId === imp.id ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : syncedImprIds[imp.id] ? (
+                                <span className="text-green-400 font-bold">✓ SINCRONIZADO</span>
+                              ) : (
+                                <span>SINCRONIZAR GITHUB</span>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

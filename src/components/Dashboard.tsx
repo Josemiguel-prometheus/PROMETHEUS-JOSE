@@ -101,10 +101,10 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [sentimentValue] = useState(72); 
 
-  // 24H Recommendations states
+  // 30D Recommendations states
   const [recList, setRecList] = useState<any[]>([]);
   const [recCurrent, setRecCurrent] = useState<any>(null);
-  const [countdown, setCountdown] = useState<number>(86400);
+  const [countdown, setCountdown] = useState<number>(2592000);
   const [showRecHistory, setShowRecHistory] = useState(false);
   const [isForcingRec, setIsForcingRec] = useState(false);
 
@@ -114,9 +114,9 @@ export default function Dashboard() {
       const data = await res.json();
       setRecList(data.list || []);
       setRecCurrent(data.current || null);
-      setCountdown(data.countdownSeconds || 86400);
+      setCountdown(data.countdownSeconds || 2592000);
     } catch (e) {
-      console.error('Error fetching 24h recommendations:', e);
+      console.error('Error fetching 30D recommendations:', e);
     }
   };
 
@@ -128,10 +128,10 @@ export default function Dashboard() {
       if (data.success) {
         setRecList(data.list || []);
         setRecCurrent(data.current || null);
-        setCountdown(data.countdownSeconds || 86400);
+        setCountdown(data.countdownSeconds || 2592000);
       }
     } catch (e) {
-      console.error('Error forcing 24h recommendations:', e);
+      console.error('Error forcing 30D recommendations:', e);
     } finally {
       setIsForcingRec(false);
     }
@@ -228,7 +228,7 @@ export default function Dashboard() {
               </div>
               <SentimentGauge value={sentimentValue} />
               <div className="hidden sm:block">
-                <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest mb-1">💡 SEÑAL 24H EN CORE</p>
+                <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest mb-1">💡 SEÑAL 30D EN CORE</p>
                 <p className="text-sm font-bold text-white uppercase italic">
                    {recCurrent ? `"${recCurrent.action}"` : '"HEDGING STRATEGICALLY REQUIRED"'}
                 </p>
