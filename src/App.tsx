@@ -33,7 +33,7 @@ import GlobalLiquidityPanel from './components/GlobalLiquidityPanel';
 const TABS = [
   { id: 'dashboard', label: 'Dashboard Principal', icon: TrendingUp },
   { id: 'global_liquidity', label: 'Índice de Liquidez Global', icon: Globe },
-  { id: 'recommendations24h', label: '💡 Señales 24H & Mejoras', icon: Clock },
+  { id: 'recommendations24h', label: '💡 Señales 30D & Mejoras', icon: Clock },
   { id: 'rotations', label: 'Rankings y Rotación', icon: Zap },
   { id: 'quotes', label: 'Cotizaciones en Tiempo Real', icon: Activity },
   { id: 'agents', label: 'Pentágono de Agentes', icon: Users },

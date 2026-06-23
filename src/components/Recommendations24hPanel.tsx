@@ -43,11 +43,12 @@ export default function Recommendations24hPanel() {
   // States
   const [recList, setRecList] = useState<Recommendation24h[]>([]);
   const [recCurrent, setRecCurrent] = useState<Recommendation24h | null>(null);
-  const [countdown, setCountdown] = useState<number>(86400);
+  const [countdown, setCountdown] = useState<number>(2592000);
   const [isForcingRec, setIsForcingRec] = useState(false);
 
   const [improvements, setImprovements] = useState<PlatformImprovement[]>([]);
   const [isLoadingImpr, setIsLoadingImpr] = useState(false);
+  const [currentImprovementIndex, setCurrentImprovementIndex] = useState<number>(0);
 
   // States for enhanced 24H Signal Historical Log
   const [searchTerm, setSearchTerm] = useState('');
@@ -128,16 +129,16 @@ export default function Recommendations24hPanel() {
   const totalVotes = improvements.reduce((acc, imp) => acc + imp.votes, 0);
   const implementedCount = improvements.filter(imp => imp.status === 'IMPLEMENTADO').length;
 
-  // Fetch 24H recommendations
+  // Fetch 30D recommendations
   const fetch24hRecs = async () => {
     try {
       const res = await fetch('/api/recommendations/24h');
       const data = await res.json();
       setRecList(data.list || []);
       setRecCurrent(data.current || null);
-      setCountdown(data.countdownSeconds || 86400);
+      setCountdown(data.countdownSeconds || 2592000);
     } catch (e) {
-      console.error('Error fetching 24h recommendations:', e);
+      console.error('Error fetching 30D recommendations:', e);
     }
   };
 
@@ -150,10 +151,10 @@ export default function Recommendations24hPanel() {
       if (data.success) {
         setRecList(data.list || []);
         setRecCurrent(data.current || null);
-        setCountdown(data.countdownSeconds || 86400);
+        setCountdown(data.countdownSeconds || 2592000);
       }
     } catch (e) {
-      console.error('Error forces generating 24h Rec:', e);
+      console.error('Error forcing 30D Rec:', e);
     } finally {
       setIsForcingRec(false);
     }
@@ -234,19 +235,23 @@ export default function Recommendations24hPanel() {
   // Countdown clock tick
   useEffect(() => {
     const timer = setInterval(() => {
-      setCountdown(prev => (prev > 0 ? prev - 1 : 86400));
+      setCountdown(prev => (prev > 0 ? prev - 1 : 2592000));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
   const formatCountdown = (sec: number) => {
-    const h = Math.floor(sec / 3600);
+    const d = Math.floor(sec / (3600 * 24));
+    const h = Math.floor((sec % (3600 * 24)) / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
+    if (d > 0) {
+      return `${d}d ${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`;
+    }
     return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
   };
 
-  // Filter derivations for 24H Signal History
+  // Filter derivations for 30D Signal History
   const filteredRecs = recList.filter(item => {
     const matchesSearch = 
       item.sector_lider.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -301,7 +306,7 @@ export default function Recommendations24hPanel() {
             <Clock className="w-5 h-5 text-orange-500" />
             <span className="text-[10px] font-bold text-orange-500 uppercase tracking-[0.2em]">GENERACIÓN ESTRATÉGICA AUTÓNOMA</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">💡 Señales 24H & Mejoras de Plataforma</h1>
+          <h1 className="text-2xl font-bold tracking-tight">💡 Señales 30D & Mejoras de Plataforma</h1>
           <p className="text-sm text-[#888] leading-relaxed">
             Consulte las recomendaciones sectoriales automáticas y vote o proponga expansiones tecnológicas directamente para sincronizar a su backlog de GitHub.
           </p>
@@ -309,7 +314,7 @@ export default function Recommendations24hPanel() {
         <div className="flex gap-2">
           <div className="bg-[#0F0F0f] border border-[#1A1A1A] px-4 py-2 rounded-sm text-center">
             <span className="text-[9px] font-bold text-gray-500 font-mono block">PRECISIÓN DE SEÑALES</span>
-            <span className="text-xs text-orange-500 font-mono font-bold">94.2% Autonóma</span>
+            <span className="text-xs text-orange-500 font-mono font-bold">94.2% Autónoma</span>
           </div>
           <div className="bg-[#0F0F0f] border border-[#1a1a1a] px-4 py-2 rounded-sm text-center">
             <span className="text-[9px] font-bold text-gray-500 font-mono block">SUGESTIONES TOTALES</span>
@@ -318,7 +323,7 @@ export default function Recommendations24hPanel() {
         </div>
       </div>
 
-      {/* Grid: 24H Recommendation & Previous Logs */}
+      {/* Grid: 30D Recommendation & Previous Logs */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Left Side: Active Signal Card + Countdown */}
@@ -329,7 +334,7 @@ export default function Recommendations24hPanel() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#222133] pb-4 mb-5 gap-3">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping"></span>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-white font-mono">SEÑAL DE ASIGNACIÓN PRINCIPAL (24 HORAS)</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white font-mono">SEÑAL DE ASIGNACIÓN PRINCIPAL (CADA 30 DÍAS)</h3>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] font-mono text-[#AAA]">Generación siguiente en:</span>
@@ -396,7 +401,7 @@ export default function Recommendations24hPanel() {
                 )}
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", isForcingRec && "animate-spin")} />
-                {isForcingRec ? 'FORZANDO CÁLCULO...' : 'FORZAR SEÑAL DE RED 24H'}
+                {isForcingRec ? 'FORZANDO CÁLCULO...' : 'FORZAR SEÑAL DE RED 30D'}
               </button>
               <div className="hidden md:flex items-center gap-2 text-[10px] text-[#666] italic font-mono bg-orange-950/5 px-4 rounded-sm">
                 <span>* Prometheus se re-calibra de forma nativa ante cada sesión de mercado bursátil de forma continua.</span>
@@ -511,58 +516,80 @@ export default function Recommendations24hPanel() {
               </form>
             )}
 
-            {/* Improvements Grid */}
+            {/* Improvements Grid - Single Focused Proposal with Rotation Option */}
             <div className="space-y-4">
               {isLoadingImpr ? (
                 <div className="py-12 text-center text-xs text-[#666]">Cargando backlog de la base de datos...</div>
               ) : improvements.length === 0 ? (
                 <div className="py-12 text-center text-xs text-[#666]">No hay mejoras propuestas registradas hoy.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {improvements.map((imp) => (
-                    <div 
-                      key={imp.id} 
-                      className="bg-[#141414] border border-[#222] hover:border-purple-500/20 p-4 rounded-sm flex flex-col justify-between space-y-3 transition-all"
+                <div className="space-y-4">
+                  {/* Active Selection Info Header */}
+                  <div className="flex items-center justify-between text-xs font-mono text-[#AAA] border-b border-[#1C1C1C] pb-2">
+                    <span className="text-gray-400">
+                      Mostrando recomendación <strong className="text-purple-400 font-bold">{currentImprovementIndex + 1}</strong> de {improvements.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentImprovementIndex(prev => (prev + 1) % improvements.length)}
+                      className="flex items-center gap-1.5 text-purple-400 hover:text-purple-300 font-bold uppercase transition-all bg-[#141414] hover:bg-purple-500/10 px-3 py-1.5 rounded-sm border border-[#2C2C2C] hover:border-purple-500/20 active:scale-95"
                     >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-mono bg-[#1A1A1A] border border-[#2A2A2A] text-gray-300 px-2 py-0.5 rounded-sm">
-                            {imp.category}
-                          </span>
-                          <span className={cn(
-                            "text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-sm",
-                            imp.status === 'IMPLEMENTADO' ? "bg-green-500/5 border border-green-500/20 text-green-400" :
-                            imp.status === 'APROBADO' ? "bg-blue-500/5 border border-blue-500/20 text-blue-400" : "bg-purple-500/5 border border-purple-500/20 text-purple-400"
-                          )}>
-                            {imp.status}
-                          </span>
+                      <RefreshCw className="w-3 h-3 text-purple-400" />
+                      <span>Siguiente Propuesta</span>
+                    </button>
+                  </div>
+
+                  {/* Single Premium Card representation */}
+                  {(() => {
+                    const imp = improvements[currentImprovementIndex] || improvements[0];
+                    if (!imp) return null;
+                    return (
+                      <div 
+                        key={imp.id} 
+                        className="bg-[#141414] border border-purple-500/10 hover:border-purple-500/25 p-5 rounded-sm flex flex-col justify-between space-y-4 transition-all relative overflow-hidden group"
+                      >
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-[40px] rounded-full pointer-events-none" />
+                        
+                        <div className="space-y-3 relative z-10">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono bg-[#1A1A1A] border border-[#2A2A2A] text-gray-300 px-2.5 py-1 rounded-sm">
+                              {imp.category}
+                            </span>
+                            <span className={cn(
+                              "text-[8px] font-bold font-mono px-2 py-0.5 rounded-sm",
+                              imp.status === 'IMPLEMENTADO' ? "bg-green-500/5 border border-green-500/20 text-green-400" :
+                              imp.status === 'APROBADO' ? "bg-blue-500/5 border border-blue-500/20 text-blue-400" : "bg-purple-500/5 border border-purple-500/20 text-purple-400"
+                            )}>
+                              {imp.status}
+                            </span>
+                          </div>
+
+                          <h4 className="text-sm font-bold text-[#E4E3E0] tracking-tight">{imp.title}</h4>
+                          <p className="text-xs text-[#888] leading-relaxed">{imp.description}</p>
                         </div>
 
-                        <h4 className="text-sm font-bold text-[#E4E3E0] tracking-tight">{imp.title}</h4>
-                        <p className="text-xs text-[#888] leading-tight">{imp.description}</p>
-                      </div>
+                        <div className="pt-4 border-t border-[#1C1C1C] flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-[8px] font-bold font-mono px-2 py-0.5 rounded-sm bg-[#1A1A1A]",
+                              imp.impact === 'ALTO' ? "text-red-400" : imp.impact === 'MEDIO' ? "text-yellow-400" : "text-gray-400"
+                            )}>
+                              Impacto {imp.impact}
+                            </span>
+                            <span className="text-[8px] font-mono text-[#444]">Hito: {imp.github_milestone}</span>
+                          </div>
 
-                      <div className="pt-3 border-t border-[#1C1C1C] flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className={cn(
-                            "text-[8px] font-bold font-mono px-1.5 py-0.5 rounded-sm bg-[#1A1A1A]",
-                            imp.impact === 'ALTO' ? "text-red-400" : imp.impact === 'MEDIO' ? "text-yellow-400" : "text-gray-400"
-                          )}>
-                            Impacto {imp.impact}
-                          </span>
-                          <span className="text-[8px] font-mono text-[#444]">Hito: {imp.github_milestone}</span>
+                          <button
+                            onClick={() => handleVote(imp.id)}
+                            className="flex items-center gap-1.5 bg-[#1C1C1C] hover:bg-purple-500/10 hover:text-purple-300 border border-[#2C2C2C] hover:border-purple-500/30 text-xs text-[#AAA] px-3 py-1.5 transition-all rounded-sm font-mono font-bold"
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                            <span>Votos: {imp.votes}</span>
+                          </button>
                         </div>
-
-                        <button
-                          onClick={() => handleVote(imp.id)}
-                          className="flex items-center gap-1.5 bg-[#1C1C1C] hover:bg-purple-500/10 hover:text-purple-300 border border-[#2C2C2C] hover:border-purple-500/30 text-xs text-[#AAA] px-2.5 py-1 transition-all rounded-sm font-mono font-bold"
-                        >
-                          <ThumbsUp className="w-3 h-3" />
-                          <span>{imp.votes}</span>
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -601,7 +628,7 @@ export default function Recommendations24hPanel() {
               <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-orange-400" />
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0]">Registro Histórico 24H</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0]">Registro Histórico 30D</h3>
                 </div>
                 <span className="text-[10px] text-orange-500 font-mono font-bold bg-orange-950/20 px-2.5 py-0.5 border border-orange-500/20 rounded-xs">
                   {filteredRecs.length} SEÑAL{filteredRecs.length !== 1 ? 'ES' : ''}
@@ -713,7 +740,7 @@ export default function Recommendations24hPanel() {
                 <Github className="w-5 h-5 flex-shrink-0" />
                 <div>
                   <h5 className="text-[10px] font-bold text-white uppercase tracking-wider">ENTREGADO PARA GITHUB</h5>
-                  <p className="text-[9px] text-[#666] leading-none">Canal de sincronización de señales 24H activo</p>
+                  <p className="text-[9px] text-[#666] leading-none">Canal de sincronización de señales 30D activo</p>
                 </div>
               </div>
               <span className="text-[8px] font-mono bg-[#1A1A1A] border border-[#2F2F2F] text-green-400 px-2 py-0.5 rounded-xs font-bold shrink-0">

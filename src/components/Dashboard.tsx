@@ -143,15 +143,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCountdown(prev => (prev > 0 ? prev - 1 : 86400));
+      setCountdown(prev => (prev > 0 ? prev - 1 : 2592000));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
   const formatCountdown = (sec: number) => {
-    const h = Math.floor(sec / 3600);
+    const d = Math.floor(sec / (3600 * 24));
+    const h = Math.floor((sec % (3600 * 24)) / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
+    if (d > 0) {
+      return `${d}d ${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`;
+    }
     return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
   };
 
@@ -303,14 +307,14 @@ export default function Dashboard() {
         {/* Right Col: Agent Commentary Stack + 24H Recommendation Panel */}
         <div className="space-y-6">
           
-          {/* 24H Recommendation Panel */}
+          {/* 30D Recommendation Panel */}
           <div className="bg-[#0f0f15] border border-purple-500/20 p-5 rounded-sm space-y-4 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-[50px] -mr-16 -mt-16 transition-all group-hover:bg-purple-500/10"></div>
             
             <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-3">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-purple-400" />
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0]">SISTEMA DE ASIGNACIÓN 24H</h3>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#E4E3E0]">SISTEMA DE ASIGNACIÓN 30D</h3>
               </div>
               <span className="text-[9px] font-mono bg-purple-500/10 border border-purple-500/20 text-purple-400 px-2 py-0.5 rounded-sm">
                 Siguiente en: {formatCountdown(countdown)}
@@ -345,7 +349,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="h-24 flex items-center justify-center animate-pulse">
-                <span className="text-xs text-[#666]">Sincronizando Recomendación Diaria...</span>
+                <span className="text-xs text-[#666]">Sincronizando Recomendación 30D...</span>
               </div>
             )}
 
@@ -354,7 +358,7 @@ export default function Dashboard() {
                 onClick={() => setShowRecHistory(!showRecHistory)}
                 className="flex-1 py-1.5 bg-[#141414] border border-[#2A2A2A] hover:bg-[#1C1C1C] text-[10px] font-bold uppercase tracking-widest text-[#AAA] transition-all"
               >
-                {showRecHistory ? 'Ocultar Historial 24H' : 'Historial 24H'}
+                {showRecHistory ? 'Ocultar Historial 30D' : 'Historial 30D'}
               </button>
               <button 
                 onClick={force24hRec}
