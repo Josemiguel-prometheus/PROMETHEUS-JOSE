@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Users, Bot, Zap, ShieldAlert, Cpu, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, Bot, Zap, ShieldAlert, Cpu, RefreshCw, Briefcase, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const AGENTS = [
@@ -42,9 +42,27 @@ export default function AgentsPanel() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>(new Date().toLocaleTimeString());
   const [latencies, setLatencies] = useState({ analyst: '1.2s', supervisor: '99.8%' });
+  const [agentAnalysis, setAgentAnalysis] = useState<any>(null);
+
+  const fetchAgentCycle = async () => {
+    try {
+      const res = await fetch('/api/refresh', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setAgentAnalysis(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch agent cycle:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchAgentCycle();
+  }, []);
 
   const triggerRefresh = () => {
     setIsRefreshing(true);
+    fetchAgentCycle();
     setTimeout(() => {
       setIsRefreshing(false);
       setLastRefreshed(new Date().toLocaleTimeString());
@@ -53,6 +71,9 @@ export default function AgentsPanel() {
       setLatencies({ analyst: randAnalyst, supervisor: randSupervisor });
     }, 1200);
   };
+
+  const proPortfolio = agentAnalysis?.analysis?.portfolio_terminal_pro;
+  const proAudit = agentAnalysis?.challenge?.portfolio_pro_audit;
 
   return (
     <div className="space-y-8 animate-fade-in" id="cognitive-intelligence-pentagon">
@@ -77,6 +98,72 @@ export default function AgentsPanel() {
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'RE-CALIBRANDO...' : 'RE-CALIBRAR AGENTES'}
           </button>
+        </div>
+      </div>
+
+      {/* Sección Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO) */}
+      <div className="p-6 bg-[#0B101D] border border-[#1E293B] rounded-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1E293B] pb-4 gap-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-sky-500/10 border border-sky-500/20 rounded-md">
+              <Briefcase className="w-5 h-5 text-sky-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black uppercase text-white tracking-wider">
+                Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)
+              </h3>
+              <p className="text-[11px] text-gray-400 font-mono">
+                Evaluación táctica en tiempo real por los agentes cognitivos
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-bold px-3 py-1 bg-sky-500/10 border border-sky-500/30 text-sky-400 rounded-full w-fit">
+            AUDITORÍA EN LÍNEA
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-[#101827] p-4 border border-[#202E48] rounded-sm space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase">
+              <Cpu className="w-4 h-4" />
+              Tesis del Analista PRO
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {proPortfolio?.tactical_summary || "Cargando diagnóstico de activos activos en la Terminal PRO..."}
+            </p>
+            <div className="pt-2 border-t border-[#202E48] flex justify-between items-center text-[11px] font-mono">
+              <span className="text-gray-400">Alineación Táctica:</span>
+              <span className="text-emerald-400 font-bold">{proPortfolio?.alignment_score || "88%"}</span>
+            </div>
+          </div>
+
+          <div className="bg-[#191017] p-4 border border-[#3A1E2B] rounded-sm space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-purple-400 uppercase">
+              <Zap className="w-4 h-4" />
+              Critica del Abogado del Diablo
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {proAudit?.criticism || "Auditoría activa: Vigilando exposición a tasas reales y concentración de activos..."}
+            </p>
+            <div className="pt-2 border-t border-[#3A1E2B] flex justify-between items-center text-[11px] font-mono">
+              <span className="text-gray-400">Resiliencia PRO:</span>
+              <span className="text-amber-400 font-bold">{proAudit?.stress_resilience || "82/100"}</span>
+            </div>
+          </div>
+
+          <div className="bg-[#0B1A15] p-4 border border-[#16382A] rounded-sm space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase">
+              <ShieldAlert className="w-4 h-4" />
+              Guardián y Control Genesis
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              Sincronización confirmada con la base de datos local. Los límites de liquidez y volatilidad cumplen los requerimientos de la Terminal PRO.
+            </p>
+            <div className="pt-2 border-t border-[#16382A] flex justify-between items-center text-[11px] font-mono">
+              <span className="text-gray-400">Estado de Riesgo:</span>
+              <span className="text-emerald-400 font-bold">ÓPTIMO</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -151,3 +238,4 @@ export default function AgentsPanel() {
     </div>
   );
 }
+

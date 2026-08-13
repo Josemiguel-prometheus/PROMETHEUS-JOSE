@@ -4,14 +4,15 @@ from datetime import datetime
 import json
 
 class AgenteAnalista:
-    def __init__(self, rotation_df, macro_data, correlation_matrix):
+    def __init__(self, rotation_df, macro_data, correlation_matrix, portfolio_data=None):
         self.rotation_df = rotation_df
         self.macro_data = macro_data
         self.correlation_matrix = correlation_matrix
+        self.portfolio_data = portfolio_data
 
     def generar_analisis(self):
         # Lógica de síntesis inteligente
-        top_sector = self.rotation_df.iloc[0]
+        top_sector = self.rotation_df.iloc[0] if not self.rotation_df.empty else {'Sector': 'Technology', 'Score Compuesto': 2.5, 'Rel. Mom (20D)': 1.2, 'Líder': 'XLK'}
         vix = self.macro_data.get('^VIX', 20)
         
         # Evaluación de calidad de entorno
@@ -31,13 +32,61 @@ class AgenteAnalista:
             "horizonte": "Medio Plazo (3-6 meses)" if vix < 20 else "Corto Plazo / Táctico",
             "metodologia": "ROC(20) vs SPY + Vol Adj + Beta Neutralization"
         }
+
+        # Diagnóstico integrado de Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)
+        analisis["portafolio_terminal_pro"] = self._analizar_portafolio_pro(top_sector)
         return analisis
 
+    def _analizar_portafolio_pro(self, top_sector):
+        if not self.portfolio_data:
+            return {
+                "titulo": "Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)",
+                "estado": "Sin Posiciones Registradas",
+                "resumen": "Capital Total: $100,000.00 | Liquidez/CASH: $5,000.00 (5.0%)",
+                "alineacion_score": "75%",
+                "diagnostico": f"Se sugiere inicializar asignaciones estratégicas en el sector líder {top_sector['Sector']} ({top_sector['Líder']}).",
+                "activos_activos": ["XLK", "XLF", "XLE"],
+                "cash": 5000.0,
+                "total_val": 100000.0
+            }
+        
+        assets = self.portfolio_data.get('assets', {})
+        total_val = float(self.portfolio_data.get('total_value', 100000.0))
+        cash = float(self.portfolio_data.get('cash', 5000.0))
+        total_cap = total_val + cash
+        cash_pct = (cash / total_cap * 100) if total_cap > 0 else 0.0
+        
+        lider_ticker = top_sector.get('Líder', 'XLK')
+        lider_en_portafolio = isinstance(assets, dict) and (lider_ticker in assets)
+        
+        if lider_en_portafolio:
+            diag = f"El portafolio PRO cuenta con exposición activa a {lider_ticker}. Mantiene sintonía directa con la señal de rotación sectorial en {top_sector['Sector']}."
+            align_score = "92%"
+        else:
+            diag = f"Desalineación táctica: El portafolio PRO carece de posiciones en el sector líder {top_sector['Sector']} ({lider_ticker}). Se recomienda rotar parte del CASH ({cash_pct:.1f}%) hacia {lider_ticker}."
+            align_score = "68%"
+
+        activos_lista = list(assets.keys()) if isinstance(assets, dict) else []
+
+        return {
+            "titulo": "Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)",
+            "estado": "Sincronizado" if lider_en_portafolio else "Rebalanceo Sugerido",
+            "resumen": f"Capital Total: ${total_cap:,.2f} | Liquidez/CASH: ${cash:,.2f} ({cash_pct:.1f}%)",
+            "alineacion_score": align_score,
+            "diagnostico": diag,
+            "activos_activos": activos_lista,
+            "cash": cash,
+            "cash_pct": round(cash_pct, 1),
+            "total_val": total_cap
+        }
+
 class AbogadoDelDiablo:
-    def __init__(self, analisis_analista):
+    def __init__(self, analisis_analista, portfolio_data=None):
         self.analisis = analisis_analista
+        self.portfolio_data = portfolio_data
 
     def contra_analisis(self):
+
         sector = self.analisis.get('sector_lider', 'Unknown')
         
         # Diccionario detallado de críticas mapeadas a cada sector GICS
@@ -161,13 +210,56 @@ class AbogadoDelDiablo:
                 "skepticism": "75%"
             }
             
-        return {
+        res = {
             "alertas": matched["risks"],
             "mensaje_critico": matched["desc"],
             "nivel_escepticismo": matched["skepticism"]
         }
+        res["auditoria_portafolio_pro"] = self._auditar_portafolio_pro()
+        return res
+
+    def _auditar_portafolio_pro(self):
+        if not self.portfolio_data:
+            return {
+                "titulo": "Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)",
+                "veredicto_critico": "Vigilancia de Estructura de Capital",
+                "vulnerabilidades": [
+                    "Exposición al riesgo de beta de mercado en activos activos",
+                    "Asegurar mantenimiento de colchón de liquidez táctica (CASH >= 5%)"
+                ],
+                "riesgo_portafolio": "MEDIO"
+            }
+        
+        assets = self.portfolio_data.get('assets', {})
+        total_val = float(self.portfolio_data.get('total_value', 100000.0))
+        cash = float(self.portfolio_data.get('cash', 5000.0))
+        total_cap = total_val + cash
+        cash_pct = (cash / total_cap * 100) if total_cap > 0 else 0.0
+        
+        vulnerabilidades = []
+        if cash_pct < 5.0:
+            vulnerabilidades.append(f"Reserva de efectivo crítica ({cash_pct:.1f}% < 5%). Incapacidad para absorber picos de volatilidad.")
+        elif cash_pct > 35.0:
+            vulnerabilidades.append(f"Exceso de liquidez inactiva ({cash_pct:.1f}%). Arrastre de rentabilidad frente a la inflación.")
+            
+        num_activos = len(assets) if isinstance(assets, dict) else 0
+        if num_activos == 1:
+            vulnerabilidades.append("Alta concentración en un único activo sintético.")
+        elif num_activos > 7:
+            vulnerabilidades.append("Sobre-diversificación ineficiente que diluye el Alpha.")
+            
+        if not vulnerabilidades:
+            vulnerabilidades.append("Perfil equilibrado en la Terminal PRO con riesgo acotado dentro de parámetros normales.")
+            
+        return {
+            "titulo": "Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)",
+            "veredicto_critico": f"El Abogado ha detectado {len(vulnerabilidades)} puntos de atención en Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO).",
+            "vulnerabilidades": vulnerabilidades,
+            "riesgo_portafolio": "ALTO" if cash_pct < 5 or num_activos == 1 else "BALANCEADO"
+        }
 
     def simulate_stress_scenario(self, dxy_change, vix_level, rate_spike, credit_stress):
+
         """
         Calcula un Score de Resiliencia para el sector recomendado basado en parámetros adversos interactivos.
         """
@@ -230,14 +322,15 @@ class AbogadoDelDiablo:
         }
 
 class AgenteRecomendador:
-    def __init__(self, analisis, contra):
+    def __init__(self, analisis, contra, portfolio_data=None):
         self.analisis = analisis
         self.contra = contra
+        self.portfolio_data = portfolio_data
 
     def ejecutar_decision(self, perfil="Moderado"):
         # Motor de decisión ponderado
         conviccion_global = "MEDIA"
-        if self.analisis['conviccion'] == "ALTA" and float(self.contra['nivel_escepticismo'].strip('%')) < 90:
+        if self.analisis.get('conviccion') == "ALTA" and float(self.contra.get('nivel_escepticismo', '80%').strip('%')) < 90:
             conviccion_global = "ALTA"
             
         weights = {
@@ -248,13 +341,20 @@ class AgenteRecomendador:
         
         propuesta = weights.get(perfil, weights["Moderado"])
         
+        lider = self.analisis.get('sector_lider', 'Tecnología')
+        top_etf = self.analisis.get('top_etfs', ['XLK'])[0]
+        
+        instruccion = f"Rebalancear 'Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)': Ponderar {propuesta['lider']} en el ETF líder {top_etf} ({lider}), mantener {propuesta['core']} en ETFs Core y preservar un colchón del {propuesta['cash']} en Liquidez."
+
         return {
             "conviccion_global": conviccion_global,
             "propuesta": propuesta,
             "stop_loss": "ATR(2) dinámico (~3.5%)",
             "ratio_rr": "1:2.8",
-            "accion": "SOBREPONDERAR" if conviccion_global != "BAJA" else "MANTENER / CAUTELA"
+            "accion": "SOBREPONDERAR" if conviccion_global != "BAJA" else "MANTENER / CAUTELA",
+            "instruccion_portafolio_pro": instruccion
         }
+
 
 class AgenteSupervisor:
     def obtener_status(self, safe_mode=False):

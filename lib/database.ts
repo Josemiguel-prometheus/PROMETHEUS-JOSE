@@ -239,3 +239,22 @@ export function getDb() {
   if (!db) throw new Error('Database not initialized. Call initDb() first.');
   return db;
 }
+
+export async function getLatestPortfolio() {
+  try {
+    const database = getDb();
+    const row = await database.get('SELECT * FROM portfolio ORDER BY timestamp DESC LIMIT 1');
+    if (row) {
+      if (typeof row.assets === 'string') {
+        try {
+          row.assets = JSON.parse(row.assets);
+        } catch (e) {
+          // keep as string
+        }
+      }
+    }
+    return row || null;
+  } catch (e) {
+    return null;
+  }
+}

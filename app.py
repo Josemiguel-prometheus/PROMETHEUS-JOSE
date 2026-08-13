@@ -641,12 +641,15 @@ elif menu == "Pentágono de Agentes":
             results.append({"Sector": name, "Líder": ticker, "Score Compuesto": score, "Rel. Mom (20D)": rel_mom})
         df_rot = pd.DataFrame(results).sort_values(by="Score Compuesto", ascending=False)
         
-        # Agentes
-        analista = agents_lib.AgenteAnalista(df_rot, {"^VIX": data["^VIX"].iloc[-1]}, None)
+        # Cargar estado de Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)
+        port_data = db_lib.get_latest_portfolio()
+        
+        # Agentes Cognitivos con contexto del Portafolio PRO
+        analista = agents_lib.AgenteAnalista(df_rot, {"^VIX": data["^VIX"].iloc[-1]}, None, portfolio_data=port_data)
         rep_analista = analista.generar_analisis()
-        abogado = agents_lib.AbogadoDelDiablo(rep_analista)
+        abogado = agents_lib.AbogadoDelDiablo(rep_analista, portfolio_data=port_data)
         rep_abogado = abogado.contra_analisis()
-        recomendador = agents_lib.AgenteRecomendador(rep_analista, rep_abogado)
+        recomendador = agents_lib.AgenteRecomendador(rep_analista, rep_abogado, portfolio_data=port_data)
         rep_final = recomendador.ejecutar_decision(st.session_state.perfil)
         
         # UI Agentes Consolidada
@@ -678,6 +681,50 @@ elif menu == "Pentágono de Agentes":
             st.write(f"**Stop Loss:** {rep_final['stop_loss']}")
             st.write(f"**Ratio R/R:** {rep_final['ratio_rr']}")
             st.markdown('</div>', unsafe_allow_html=True)
+
+        # Sección dedicada: Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)
+        st.divider()
+        st.markdown('<div style="background-color: #0f172a; border-left: 6px solid #38bdf8; padding: 14px 20px; border-radius: 4px; font-weight: 800; color: #f8fafc; font-size: 15px;">💼 DIAGNÓSTICO DE AGENTES: Mi portafolio TERMINAL DE GESTIÓN DE ACTIVOS (PRO)</div>', unsafe_allow_html=True)
+        st.caption("Auditoría en tiempo real de la composición activa de la Terminal PRO realizada por el Pentágono de Agentes Cognitivos.")
+        
+        port_pro = rep_analista.get("portafolio_terminal_pro", {})
+        aud_pro = rep_abogado.get("auditoria_portafolio_pro", {})
+        inst_pro = rep_final.get("instruccion_portafolio_pro", "")
+        
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            st.markdown('<div class="metric-card" style="border-top: 3px solid #38bdf8;">', unsafe_allow_html=True)
+            st.markdown("##### 📊 Estado del Portafolio PRO")
+            st.write(f"**Alineación Táctica:** {port_pro.get('alineacion_score', 'N/A')}")
+            st.write(f"**Estructura de Capital:** {port_pro.get('resumen', 'N/A')}")
+            st.info(port_pro.get('diagnostico', ''))
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        with col_p2:
+            st.markdown('<div class="metric-card" style="border-top: 3px solid #f87171;">', unsafe_allow_html=True)
+            st.markdown("##### ⚖️ Auditoría del Abogado del Diablo")
+            st.write(f"**Veredicto:** {aud_pro.get('veredicto_critico', 'N/A')}")
+            st.write(f"**Nivel de Riesgo:** `{aud_pro.get('riesgo_portafolio', 'N/A')}`")
+            st.write("**Vulnerabilidades Detectadas:**")
+            for vul in aud_pro.get('vulnerabilidades', []):
+                st.markdown(f"- ⚠️ {vul}")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        with col_p3:
+            st.markdown('<div class="metric-card" style="border-top: 3px solid #34d399;">', unsafe_allow_html=True)
+            st.markdown("##### 🎯 Recomendación del Asesor PRO")
+            st.write("**Instrucción de Rebalanceo:**")
+            st.success(inst_pro)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        # Guardianía en tiempo real
+        guardian = agents_lib.AgenteGuardian(port_data, data)
+        guardian_recs = guardian.generar_recomendaciones_asesor(info_vix=data["^VIX"].iloc[-1] if "^VIX" in data.columns else 20)
+        if guardian_recs:
+            with st.expander("🛡️ RECOMENDACIONES DE GUARDIANÍA Y CONSERVACIÓN PRO", expanded=False):
+                for gr in guardian_recs:
+                    st.markdown(f"- {gr}", unsafe_allow_html=True)
+
 
         # Protocolo de Operación
         st.divider()
