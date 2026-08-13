@@ -246,7 +246,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Right Col: Agent Commentary Stack + 24H Recommendation Panel */}
+        {/* Right Col: Agent Commentary Stack */}
         <div className="space-y-6">
           
           <div className="flex items-center justify-between px-1">

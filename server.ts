@@ -692,8 +692,8 @@ async function startServer() {
             `   - Servidor unificado escrito en TypeScript usando **Express**. En producción, sirve los archivos estáticos desde \`dist/\`, procesa peticiones HTTP sobre el puerto \`3000\` y unifica las API de negocio.\n` +
             `   - Monta middleware de Vite en entornos de desarrollo (\`process.env.NODE_ENV !== "production"\`) para habilitar compilación ágil en caliente.\n` +
             `2. **Visualizadores de Datos & Módulos React (\`/src\`)**:\n` +
-            `   - \`App.tsx\`: Organiza la vista y distribuye los controles de pestañas (Dashboard, Señales, Backlog, Copiloto).\n` +
-            `   - \`/src/components\`: Módulos visuales altamente pulidos como \`Dashboard.tsx\`, \`PrometheusAIPanel.tsx\`, \`Recommendations24hPanel.tsx\`, and \`SectorDrilldown.tsx\` usando **Tailwind CSS**, **Recharts** y **D3**.\n` +
+            `   - \`App.tsx\`: Organiza la vista y distribuye los controles de pestañas (Dashboard, Liquidez Global, Rotaciones, Agentes).\n` +
+            `   - \`/src/components\`: Módulos visuales altamente pulidos como \`Dashboard.tsx\`, \`AgentsPanel.tsx\`, y \`SectorDrilldown.tsx\` usando **Tailwind CSS**, **Recharts** y **D3**.\n` +
             `3. **Ecosistema Paralelo Python (\`app.py\` & \`requirements.txt\`)**:\n` +
             `   - Proporciona un portal analítico alternativo basado en **Streamlit** que interactúa con el mismo motor de base de datos sqlite3.\n` +
             `4. **Módulo de Persistencia Local (\`lib/database.ts\` & \`lib/database_py.py\`)**:\n` +
