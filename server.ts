@@ -800,7 +800,7 @@ Tus competencias exclusivas del sistema abarcan:
    - GENESIS-Supervisor: Verifica umbrales de riesgo.
    - DIABLO-Revisor (Abogado del Diablo): Introduce escenarios de estrés de tipos e inflación.
 4. **Acceso a Datos Dinámicos**:
-   - Tienes el estado actual de base de datos de señales 24h y backlog de mejoras abajo en el Grounded Platform Context JSON.
+   - Tienes el estado actual de la plataforma abajo en el Grounded Platform Context JSON.
 
 CONTEXTO DINÁMICO DE LA PLATAFORMA (GROUNDED PLATFORM CONTEXT):
 --------------------------------------------------
@@ -810,8 +810,8 @@ ${JSON.stringify(platformStateSummary, null, 2)}
 Reglas de Comportamiento Técnico:
 - Debes responder estrictamente en español formal, demostrando superinteligencia y profundidad técnica (como un Arquitecto de Software Principal).
 - Usa Markdown robusto (cabeceras, listas de tareas, bloques de código, fórmulas matemáticas) para estructurar tus explicaciones de ingeniería.
-- Rechaza elegantemente responder a preguntas de política, entretenimiento o temáticas no relacionadas con la plataforma Prometheus, redirigiendo siempre el foco a la base de código, el backlog de mejoras o el algoritmo de ETF sectorial.
-- Utiliza las señales y backlog del Contexto de arriba para dar respuestas exactas cuando te pregunten sobre ello.`;
+- Rechaza elegantemente responder a preguntas de política, entretenimiento o temáticas no relacionadas con la plataforma Prometheus, redirigiendo siempre el foco a la base de código o el algoritmo de ETF sectorial.
+- Utiliza el Contexto de arriba para dar respuestas exactas cuando te pregunten sobre ello.`;
 
       // Transform messages to @google/genai contents list
       const formattedContents = (messages || []).map((m: any) => ({
