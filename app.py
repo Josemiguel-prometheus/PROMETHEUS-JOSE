@@ -1098,24 +1098,48 @@ elif menu == "Mi Portafolio":
             real_time_assets = {}
             total_market_value = 0.0
             
-            if not px_port.empty:
-                last_prices = px_port.iloc[-1]
-                for t, data in current_p['assets'].items():
-                    shares = float(data.get('shares', 0.0)) if isinstance(data, dict) else 0.0
-                    price = float(last_prices[t]) if t in last_prices else (float(data.get('price', 0.0)) if isinstance(data, dict) else 0.0)
-                    mv = shares * price
-                    real_time_assets[t] = {"shares": shares, "price": price, "market_value": mv}
-                    total_market_value += mv
-            else:
-                # Fallback a datos estáticos si no hay conexión
-                for t, data in current_p['assets'].items():
-                    shares = float(data.get('shares', 0.0)) if isinstance(data, dict) else 0.0
-                    price = float(data.get('price', 0.0)) if isinstance(data, dict) else 0.0
-                    mv = shares * price
-                    real_time_assets[t] = {"shares": shares, "price": price, "market_value": mv}
-                    total_market_value += mv
+            for t, data in current_p['assets'].items():
+                shares = 0.0
+                price = 0.0
+                weight_pct = 0.0
+                
+                if isinstance(data, dict):
+                    shares = float(data.get('shares', 0.0))
+                    price = float(data.get('price', 0.0))
+                    w_str = str(data.get('weight', '0')).replace('%', '').strip()
+                    try:
+                        weight_pct = float(w_str)
+                    except ValueError:
+                        weight_pct = 0.0
+                elif isinstance(data, (int, float)):
+                    weight_pct = float(data)
+                
+                # Obtener precio en tiempo real de px_port si está disponible
+                if not px_port.empty and t in px_port.columns:
+                    live_price = float(px_port[t].iloc[-1])
+                    if live_price > 0:
+                        price = live_price
+                
+                mv = shares * price
+                real_time_assets[t] = {
+                    "shares": shares,
+                    "price": price,
+                    "market_value": mv,
+                    "weight_pct": weight_pct
+                }
+                total_market_value += mv
 
-            total_net = total_market_value + current_p.get('cash', 0.0)
+            # Si total_market_value es 0 pero existen pesos declarados, estimar valor de mercado
+            base_portfolio_val = float(current_p.get('total_value', 100000.0))
+            if total_market_value == 0 and real_time_assets:
+                for t, item in real_time_assets.items():
+                    if item['weight_pct'] > 0:
+                        estimated_mv = (item['weight_pct'] / 100.0) * base_portfolio_val
+                        item['market_value'] = estimated_mv
+                        total_market_value += estimated_mv
+
+            total_cash = float(current_p.get('cash', 0.0))
+            total_net = total_market_value + total_cash
             
             # Calcular Retorno Histórico vs Benchmark
             if not px_port.empty:
@@ -1128,7 +1152,7 @@ elif menu == "Mi Portafolio":
 
             m1.metric("Valor Total (NAV)", f"${total_net:,.2f}", f"{p_ret*100:.2f}%")
             m2.metric("Market Value", f"${total_market_value:,.2f}")
-            m3.metric("Cash Balance", f"${current_p.get('cash', 0.0):,.2f}")
+            m3.metric("Cash Balance", f"${total_cash:,.2f}")
             m4.metric("Alpha vs SPY", f"{alpha*100:.2f}%", delta_color="normal")
 
             st.divider()
@@ -1136,19 +1160,169 @@ elif menu == "Mi Portafolio":
             col_l, col_r = st.columns([1, 1])
             with col_l:
                 st.subheader("Diversificación Sectorial (Tiempo Real)")
-                labels = list(real_time_assets.keys()) + ["CASH"]
-                weights = []
-                for t, data in real_time_assets.items():
-                    w = (data['market_value'] / total_net * 100) if total_net > 0 else 0.0
-                    weights.append(w)
                 
-                cash_w = (current_p.get('cash', 0.0) / total_net * 100) if total_net > 0 else 0.0
-                weights.append(cash_w)
+                SECTOR_MAPPING = {
+                    # Sectores GICS
+                    "XLK": "Tecnología",
+                    "XLE": "Energía",
+                    "XLF": "Financiero",
+                    "XLV": "Salud",
+                    "XLY": "Consumo Discrecional",
+                    "XLP": "Consumo Básico",
+                    "XLI": "Industrial",
+                    "XLB": "Materiales",
+                    "XLC": "Servicios de Comunicación",
+                    "XLU": "Servicios Públicos",
+                    "XLRE": "Bienes Raíces",
+                    
+                    # Índices y Renta Variable Broad/Regional
+                    "SPY": "Renta Variable (S&P 500)",
+                    "VOO": "Renta Variable (S&P 500)",
+                    "IVV": "Renta Variable (S&P 500)",
+                    "QQQ": "Tecnología (Nasdaq 100)",
+                    "IWM": "Renta Variable (Small Caps)",
+                    "EEM": "Mercados Emergentes",
+                    "EFA": "Mercados Desarrollados",
+                    "RUI": "Renta Variable (Russell 1000)",
+                    
+                    # Renta Fija / Bonos
+                    "TLT": "Renta Fija (Largo Plazo)",
+                    "IEF": "Renta Fija (Medio Plazo)",
+                    "SHY": "Renta Fija (Corto Plazo)",
+                    "HYG": "Renta Fija (High Yield)",
+                    "LQD": "Renta Fija (Corporativos)",
+                    "AGG": "Renta Fija (Global)",
+                    "BND": "Renta Fija (Global)",
+                    "US10Y": "Renta Fija (10Y Yield)",
+                    
+                    # Commodities / Metales
+                    "GLD": "Materias Primas (Oro)",
+                    "SLV": "Materias Primas (Plata)",
+                    "IAU": "Materias Primas (Oro)",
+                    "DBC": "Materias Primas (Generales)",
+                    "USO": "Materias Primas (Petróleo)",
+                    "CL=F": "Materias Primas (Petróleo WTI)",
+                    "HG=F": "Materias Primas (Cobre)",
+                    
+                    # Criptoactivos
+                    "BTC-USD": "Criptoactivos (Bitcoin)",
+                    "BTC": "Criptoactivos (Bitcoin)",
+                    "ETH-USD": "Criptoactivos (Ethereum)",
+                    "ETH": "Criptoactivos (Ethereum)",
+                    "IBIT": "Criptoactivos (Bitcoin ETF)",
+                    
+                    # Liquidez / Caja
+                    "CASH": "Liquidez / Caja USD",
+                    "BIL": "Liquidez / T-Bills",
+                    "SGOV": "Liquidez / T-Bills"
+                }
+
+                # Agrupar por Sector Real
+                sector_totals = {}
                 
-                fig = px.pie(names=labels, values=weights, hole=0.5, 
-                             color_discrete_sequence=px.colors.sequential.Oranges_r)
-                fig.update_layout(template="plotly_dark", showlegend=True, margin=dict(t=10, b=10, l=10, r=10), height=350)
-                st.plotly_chart(fig, use_container_width=True)
+                # Incorporar efectivo (Cash) si existe
+                if total_cash > 0:
+                    sector_totals["Liquidez / Caja USD"] = {
+                        "market_value": total_cash,
+                        "assets": ["CASH"]
+                    }
+                    
+                for t, item in real_time_assets.items():
+                    mv = float(item.get('market_value', 0.0))
+                    if mv <= 0:
+                        continue
+                    sec_name = SECTOR_MAPPING.get(t, SECTORES_GICS.get(t, f"Otros ({t})"))
+                    if sec_name not in sector_totals:
+                        sector_totals[sec_name] = {"market_value": 0.0, "assets": []}
+                    sector_totals[sec_name]["market_value"] += mv
+                    if t not in sector_totals[sec_name]["assets"]:
+                        sector_totals[sec_name]["assets"].append(t)
+
+                # Si no hay activos, mostrar estado por defecto
+                if not sector_totals:
+                    sector_totals["Liquidez / Caja USD"] = {
+                        "market_value": total_net if total_net > 0 else 100000.0,
+                        "assets": ["CASH"]
+                    }
+
+                sorted_sectors = sorted(sector_totals.items(), key=lambda x: x[1]["market_value"], reverse=True)
+                sec_labels = [s[0] for s in sorted_sectors]
+                sec_values = [s[1]["market_value"] for s in sorted_sectors]
+                sec_assets_str = [", ".join(s[1]["assets"]) for s in sorted_sectors]
+                sec_pcts = [(s[1]["market_value"] / total_net * 100) if total_net > 0 else 0.0 for s in sorted_sectors]
+
+                SECTOR_COLOR_MAP = {
+                    "Tecnología": "#06b6d4",
+                    "Tecnología (Nasdaq 100)": "#0284c7",
+                    "Energía": "#f97316",
+                    "Financiero": "#10b981",
+                    "Salud": "#f43f5e",
+                    "Consumo Discrecional": "#a855f7",
+                    "Consumo Básico": "#eab308",
+                    "Industrial": "#3b82f6",
+                    "Materiales": "#84cc16",
+                    "Servicios de Comunicación": "#ec4899",
+                    "Servicios Públicos": "#6366f1",
+                    "Bienes Raíces": "#d946ef",
+                    "Renta Variable (S&P 500)": "#38bdf8",
+                    "Renta Variable (Small Caps)": "#fb923c",
+                    "Mercados Emergentes": "#facc15",
+                    "Mercados Desarrollados": "#a3e635",
+                    "Renta Fija (Largo Plazo)": "#8b5cf6",
+                    "Renta Fija (Medio Plazo)": "#c084fc",
+                    "Renta Fija (Corto Plazo)": "#e879f9",
+                    "Renta Fija (High Yield)": "#f472b6",
+                    "Renta Fija (Corporativos)": "#a78bfa",
+                    "Renta Fija (Global)": "#818cf8",
+                    "Materias Primas (Oro)": "#eab308",
+                    "Materias Primas (Plata)": "#94a3b8",
+                    "Materias Primas (Generales)": "#d97706",
+                    "Criptoactivos (Bitcoin)": "#f59e0b",
+                    "Criptoactivos (Ethereum)": "#6366f1",
+                    "Liquidez / Caja USD": "#22c55e"
+                }
+                
+                fallback_colors = ["#06b6d4", "#f97316", "#10b981", "#38bdf8", "#a855f7", "#f43f5e", "#eab308", "#84cc16", "#3b82f6", "#ec4899"]
+                slice_colors = [SECTOR_COLOR_MAP.get(lbl, fallback_colors[i % len(fallback_colors)]) for i, lbl in enumerate(sec_labels)]
+
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=sec_labels,
+                    values=sec_values,
+                    customdata=sec_assets_str,
+                    hole=0.50,
+                    marker=dict(colors=slice_colors, line=dict(color='#0f172a', width=2)),
+                    textinfo='percent+label',
+                    textposition='inside',
+                    insidetextorientation='horizontal',
+                    hovertemplate="<b>Sector: %{label}</b><br>Activos: %{customdata}<br>Valor: $%{value:,.2f}<br>Ponderación: %{percent:.1%}<extra></extra>"
+                )])
+
+                fig_pie.update_layout(
+                    template="plotly_dark",
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.12,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=11, color="#cbd5e1")
+                    ),
+                    margin=dict(t=15, b=45, l=15, r=15),
+                    height=370
+                )
+
+                st.plotly_chart(fig_pie, use_container_width=True)
+
+                st.write("")
+                st.markdown("##### 📋 Desglose de Ponderación Sectorial")
+                df_sec_table = pd.DataFrame({
+                    "Sector / Categoría": sec_labels,
+                    "Activos / Tickers": sec_assets_str,
+                    "Valor de Mercado ($)": [f"${v:,.2f}" for v in sec_values],
+                    "Ponderación Real (%)": [f"{p:.1f}%" for p in sec_pcts]
+                })
+                st.dataframe(df_sec_table, use_container_width=True, hide_index=True)
 
             with col_r:
                 st.subheader("Performance vs SPY (Base 100)")
