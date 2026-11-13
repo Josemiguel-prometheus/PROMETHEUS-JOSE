@@ -1057,7 +1057,7 @@ elif menu == "Mi Portafolio":
     # Cargar datos de mercado para el portafolio
     if current_p and current_p['assets']:
         with st.spinner("Sincronizando precios en tiempo real..."):
-            all_portfolio_tickers = list(current_p['assets'].keys()) + ["SPY", "^VIX"]
+            all_portfolio_tickers = list(dict.fromkeys(list(current_p['assets'].keys()) + ["SPY", "^VIX"]))
             px_port = get_global_data(all_portfolio_tickers, st.session_state.safe_mode)
     else:
         px_port = pd.DataFrame()
@@ -1532,14 +1532,15 @@ elif menu == "Mi Portafolio":
             st.subheader("Análisis de Riesgo Institucional")
             
             # Calcular Beta y Volatilidad
-            # Usar retornos diarios
-            rets = px_port.pct_change().dropna()
+            # Usar retornos diarios con columnas deduplicadas
+            px_clean = px_port.loc[:, ~px_port.columns.duplicated()]
+            rets = px_clean.pct_change().dropna()
             
             # Cartera Rebalanceada
             weights_vec = []
             valid_tickers = []
             for t, w in current_p['assets'].items():
-                if t in rets.columns:
+                if t in rets.columns and t not in valid_tickers:
                     val = float(str(w.get('weight', '0') if isinstance(w, dict) else w).strip('%'))/100
                     weights_vec.append(val)
                     valid_tickers.append(t)
@@ -1548,22 +1549,30 @@ elif menu == "Mi Portafolio":
                 port_rets = (rets[valid_tickers] * weights_vec).sum(axis=1)
                 
                 # Volatilidad Anualizada
-                vol_ann = port_rets.std() * np.sqrt(252) * 100
-                spy_vol = rets['SPY'].std() * np.sqrt(252) * 100
+                port_std_ann = float(port_rets.std() * np.sqrt(252))
+                vol_ann = port_std_ann * 100
+                spy_vol = float(rets['SPY'].std() * np.sqrt(252) * 100) if 'SPY' in rets.columns else vol_ann
                 
                 # Beta
-                covariance = np.cov(port_rets, rets['SPY'])[0,1]
-                variance = np.var(rets['SPY'])
-                beta = covariance / variance
+                if 'SPY' in rets.columns and len(port_rets) > 1:
+                    covariance = float(np.cov(port_rets, rets['SPY'])[0, 1])
+                    variance = float(np.var(rets['SPY']))
+                    beta = covariance / variance if variance > 0 else 1.0
+                else:
+                    beta = 1.0
                 
+                sharpe = ((float(port_rets.mean()) * 252 - 0.04) / port_std_ann) if port_std_ann > 0 else 0.0
+
                 c_r1, c_r2, c_r3 = st.columns(3)
                 c_r1.metric("Beta de Cartera", f"{beta:.2f}", help="Sensibilidad vs S&P 500. 1.0 = Mismo riesgo que mercado.")
                 c_r2.metric("Volatilidad Anual", f"{vol_ann:.2f}%", f"{vol_ann - spy_vol:.1f}% vs SPY")
-                c_r3.metric("Sharpe Ratio (Est.)", f"{(port_rets.mean()*252 - 0.04) / (port_rets.std()*np.sqrt(252)):.2f}", help="Retorno ajustado por riesgo (Rf=4%).")
+                c_r3.metric("Sharpe Ratio (Est.)", f"{sharpe:.2f}", help="Retorno ajustado por riesgo (Rf=4%).")
 
                 st.divider()
                 st.subheader("Frontera de Correlación")
-                corr = rets[valid_tickers + ["SPY"]].corr()
+                corr_tickers = list(dict.fromkeys(valid_tickers + (["SPY"] if "SPY" in rets.columns else [])))
+                corr = rets[corr_tickers].corr().round(2)
+                corr = corr.loc[~corr.index.duplicated(), ~corr.columns.duplicated()]
                 fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto")
                 fig_corr.update_layout(template="plotly_dark", height=450)
                 st.plotly_chart(fig_corr, use_container_width=True)
@@ -1573,13 +1582,14 @@ elif menu == "Mi Portafolio":
                 st.caption("Mide en tiempo real si tus activos se mueven demasiado sincronizados con el Benchmark, perdiendo la desasociación de riesgo.")
                 
                 rolling_win = min(30, len(rets))
-                if rolling_win > 5:
+                if rolling_win > 5 and 'SPY' in rets.columns:
                     rolling_corrs = {}
                     for t in valid_tickers:
                         if t != "SPY":
                             rolling_corrs[t] = rets[t].rolling(window=rolling_win).corr(rets['SPY'])
                     
                     df_rolling = pd.DataFrame(rolling_corrs).dropna()
+                    df_rolling = df_rolling.loc[:, ~df_rolling.columns.duplicated()]
                     if not df_rolling.empty:
                         fig_roll = px.line(df_rolling, labels={"value": "Coeficiente de Correlación", "index": "Fecha"})
                         fig_roll.add_hline(y=0.85, line_dash="dash", line_color="#ef4444", annotation_text="Sincronización Extrema (0.85)", annotation_position="top left")

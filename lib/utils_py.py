@@ -19,8 +19,8 @@ def load_market_data(tickers, safe_mode=False):
     retries = 3
     df = pd.DataFrame()
     
-    # Filtrar None y strings vacíos
-    tickers = [t for t in tickers if t]
+    # Filtrar None, strings vacíos y duplicados preservando el orden
+    tickers = list(dict.fromkeys([str(t).strip() for t in tickers if t]))
     if not tickers:
         return pd.DataFrame()
     
@@ -120,8 +120,9 @@ def load_market_data(tickers, safe_mode=False):
             
             log_system_event("INFO", "DataFetcher", f"Inyección Core: Autocalibrada trayectoria sintética para '{t}' (Guardia Activa).")
 
-    # Asegurar índice compatible datetime64
+    # Asegurar índice compatible datetime64 y columnas únicas
     df.index = pd.to_datetime(df.index)
+    df = df.loc[:, ~df.columns.duplicated()]
     
     log_system_event("INFO", "DataFetcher", f"Sincronización robusta completada: {len(tickers)} activos listados con total resiliencia.")
     return df

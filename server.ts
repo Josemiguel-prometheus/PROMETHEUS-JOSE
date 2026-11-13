@@ -11,7 +11,7 @@ dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Initialize DB before anything else
   await initDb();
@@ -882,4 +882,7 @@ Reglas de Comportamiento Técnico:
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Failed to start PROMETHEUS server:', err);
+  process.exit(1);
+});

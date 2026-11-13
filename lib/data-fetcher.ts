@@ -1,4 +1,6 @@
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
+
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 export interface AssetQuote {
   symbol: string;
@@ -27,10 +29,10 @@ export async function getQuotes(symbols: string[]): Promise<AssetQuote[]> {
           const quote: any = await yahooFinance.quote(normalizedSymbol);
           return {
             symbol,
-            price: quote.regularMarketPrice || 0,
-            change: quote.regularMarketChange || 0,
-            changePercent: quote.regularMarketChangePercent || 0,
-            name: quote.shortName || symbol
+            price: quote?.regularMarketPrice || 0,
+            change: quote?.regularMarketChange || 0,
+            changePercent: quote?.regularMarketChangePercent || 0,
+            name: quote?.shortName || symbol
           };
         } catch (e) {
           console.error(`Error fetching ${symbol}:`, e);
@@ -60,13 +62,13 @@ export async function getHistoricalData(symbol: string, days: number = 30) {
   start.setDate(end.getDate() - days);
 
   try {
-    const queryOptions = { 
-      period1: start, 
+    const result: any = await yahooFinance.chart(normalizedSymbol, {
+      period1: start,
       period2: end,
-      interval: '1d' as any
-    };
-    const result: any = await yahooFinance.historical(normalizedSymbol, queryOptions);
-    return result.filter((d: any) => d.close != null);
+      interval: '1d'
+    });
+    const quotes = result?.quotes || [];
+    return quotes.filter((d: any) => d.close != null);
   } catch (e) {
     console.warn(`Error fetching history for ${symbol}:`, e);
     return [];
