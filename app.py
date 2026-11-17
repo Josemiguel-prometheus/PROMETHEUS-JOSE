@@ -1328,20 +1328,23 @@ elif menu == "Mi Portafolio":
                 st.subheader("Performance vs SPY (Base 100)")
                 if not px_port.empty:
                     # Crear índice de rendimiento acumulado dinámico 
+                    px_clean_p1 = px_port.loc[:, ~px_port.columns.duplicated()]
                     weights_dict = {}
                     for t, data in real_time_assets.items():
                         weights_dict[t] = data['market_value'] / total_net if total_net > 0 else 0.0
                     
-                    norm_px = px_port / px_port.iloc[0] * 100
-                    port_index = pd.Series(0, index=norm_px.index)
+                    norm_px = px_clean_p1 / px_clean_p1.iloc[0] * 100
+                    port_index = pd.Series(0.0, index=norm_px.index)
                     for t, w in weights_dict.items():
-                        if t in norm_px.columns: port_index += norm_px[t] * w
+                        if t in norm_px.columns:
+                            port_index += norm_px[t] * w
                     
                     port_index += (current_p.get('cash', 0.0) / total_net) * 100 if total_net > 0 else 0.0
 
                     fig_perf = go.Figure()
                     fig_perf.add_trace(go.Scatter(x=port_index.index, y=port_index, name='Mi Cartera', line=dict(color='#f97316', width=3)))
-                    fig_perf.add_trace(go.Scatter(x=norm_px.index, y=norm_px['SPY'], name='S&P 500', line=dict(color='#888', dash='dot')))
+                    if 'SPY' in norm_px.columns:
+                        fig_perf.add_trace(go.Scatter(x=norm_px.index, y=norm_px['SPY'], name='S&P 500', line=dict(color='#888', dash='dot')))
                     fig_perf.update_layout(template="plotly_dark", height=350, margin=dict(t=10, b=10, l=10, r=10),
                                          legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig_perf, use_container_width=True)
@@ -1351,16 +1354,22 @@ elif menu == "Mi Portafolio":
             st.info("Configura tu cartera en la pestaña 'Configuración' para comenzar.")
 
     with tab_p2:
+        # Sincronizar el estado de la sesión cuando cambia la versión del portafolio en SQLite (p.ej. tras Rebalanceo, Consolidación o Reset)
+        current_p_id = (current_p.get('id'), current_p.get('timestamp')) if current_p else None
+        if st.session_state.get('portfolio_sync_id') != current_p_id or 'portfolio_tickers' not in st.session_state:
+            st.session_state.portfolio_sync_id = current_p_id
+            if current_p and current_p.get('assets'):
+                st.session_state.portfolio_tickers = list(current_p['assets'].keys())
+                for t_sync, d_sync in current_p['assets'].items():
+                    if isinstance(d_sync, dict):
+                        st.session_state[f"shares_input_{t_sync}"] = float(d_sync.get('shares', 0.0))
+                st.session_state["portfolio_cash_input"] = float(current_p.get('cash', 0.0))
+            else:
+                st.session_state.portfolio_tickers = ["SPY", "QQQ"]
+
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
             st.subheader("Configuración de Activos (Manual)")
-            
-            # Inicializar los tickers de la cartera en st.session_state si no existen descritos
-            if 'portfolio_tickers' not in st.session_state:
-                if current_p and current_p.get('assets'):
-                    st.session_state.portfolio_tickers = list(current_p['assets'].keys())
-                else:
-                    st.session_state.portfolio_tickers = ["SPY", "QQQ"]
 
             # Entrada interactiva con botón de validación externa
             st.markdown("#### 🛡️ Introducir y Validar ETF")
@@ -1409,45 +1418,57 @@ elif menu == "Mi Portafolio":
                     # El guardián da feedback visual si el ticker ya está cargado en caché de mercado
                     valid_t, msg_t = guardian.validar_ticker(t)
                     label_suffix = " ✅" if valid_t else " 🔍"
-                    shares_input[t] = st.number_input(f"Cantidad de {t}{label_suffix}", value=def_shares, min_value=0.0, step=0.01)
+                    shares_input[t] = st.number_input(
+                        f"Cantidad de {t}{label_suffix}",
+                        value=def_shares,
+                        min_value=0.0,
+                        step=0.01,
+                        key=f"shares_input_{t}"
+                    )
                 
                 st.divider()
-                cash_input = st.number_input("💵 Efectivo (Cash USD)", value=current_p.get('cash', 0.0) if current_p else 10000.0)
+                cash_default = float(current_p.get('cash', 0.0)) if current_p else 10000.0
+                cash_input = st.number_input("💵 Efectivo (Cash USD)", value=cash_default, min_value=0.0, key="portfolio_cash_input")
                 
                 if st.form_submit_button("🗄️ CONSOLIDAR CARTERA"):
                     if not st.session_state.portfolio_tickers:
                         st.error("Protocolo Guardian: No has introducido ningún ticker para monitorizar.")
                     else:
                         with st.spinner("Guardián: Validando activos y sincronizando cotizaciones..."):
-                            all_req_t = list(set(st.session_state.portfolio_tickers + ["SPY", "^VIX"]))
-                            new_data_df = get_global_data(all_req_t, True)
+                            all_req_t = list(dict.fromkeys(st.session_state.portfolio_tickers + ["SPY", "^VIX"]))
+                            new_data_df = get_global_data(all_req_t, st.session_state.safe_mode)
                             
                             if not new_data_df.empty:
                                 last_prices_new = new_data_df.iloc[-1]
                                 
-                                # Cálculo de MV y pesos
+                                # Cálculo de MV y pesos con protección contra NaN
                                 mv_map = {}
                                 total_market_v = 0.0
                                 for t, sh in shares_input.items():
-                                    price_curr = float(last_prices_new[t]) if t in last_prices_new else 0.0
-                                    mv = float(sh * price_curr)
-                                    mv_map[t] = {"shares": sh, "price": price_curr, "market_value": mv}
+                                    raw_px = last_prices_new[t] if t in last_prices_new.index else None
+                                    price_curr = float(raw_px) if (raw_px is not None and pd.notna(raw_px) and float(raw_px) > 0) else 0.0
+                                    if price_curr == 0.0 and current_p and isinstance(current_p.get('assets', {}).get(t), dict):
+                                        price_curr = float(current_p['assets'][t].get('price', 0.0))
+                                    mv = float(sh) * price_curr
+                                    mv_map[t] = {"shares": float(sh), "price": price_curr, "market_value": mv}
                                     total_market_v += mv
                                 
-                                nav_total = float(total_market_v + cash_input)
+                                nav_total = float(total_market_v + float(cash_input))
                                 
                                 # Construcción de estructura final
                                 final_p_assets = {}
                                 for t, d in mv_map.items():
-                                    w_calc = (d['market_value'] / nav_total * 100) if nav_total > 0 else 0.0
+                                    w_calc = (d['market_value'] / nav_total * 100.0) if nav_total > 0 else 0.0
                                     final_p_assets[t] = {
                                         "weight": f"{w_calc:.2f}%",
                                         "shares": float(d['shares']),
                                         "price": float(d['price'])
                                     }
                                 
-                                spy_px = float(last_prices_new['SPY']) if 'SPY' in last_prices_new else 0.0
+                                raw_spy = last_prices_new['SPY'] if 'SPY' in last_prices_new.index else None
+                                spy_px = float(raw_spy) if (raw_spy is not None and pd.notna(raw_spy)) else 0.0
                                 db_lib.save_portfolio(final_p_assets, float(total_market_v), float(cash_input), float(spy_px))
+                                st.session_state.portfolio_sync_id = None
                                 st.success("Agente Guardián: Cartera consolidada y validada con éxito.")
                                 st.rerun()
                             else:
@@ -1456,33 +1477,74 @@ elif menu == "Mi Portafolio":
         with col_c2:
             st.subheader("Auditoría de Posiciones")
             if current_p and current_p.get('assets'):
-                rows = []
+                # Detectar si existen cambios locales sin consolidar en el formulario
+                saved_tickers = set(current_p['assets'].keys())
+                draft_tickers = set(st.session_state.get('portfolio_tickers', []))
+                if saved_tickers != draft_tickers:
+                    st.warning("⚠️ Tienes cambios en la lista de ETFs pendientes de guardar. Haz clic en **'🗄️ CONSOLIDAR CARTERA'** para actualizar la auditoría.")
+
+                # Calcular valoración y pesos actualizados en tiempo real con px_port
+                audit_items = []
+                audit_total_mv = 0.0
+                base_val_fallback = float(current_p.get('total_value', 100000.0) or 100000.0)
+
                 for t, w in current_p['assets'].items():
-                    # Validación del guardián para cada fila
-                    v_icon = "✅" if t in px_port.columns else "⏳"
-                    
+                    has_live = not px_port.empty and t in px_port.columns and pd.notna(px_port[t].iloc[-1]) and float(px_port[t].iloc[-1]) > 0
+                    v_icon = "✅" if has_live else "⏳"
+
                     if isinstance(w, dict):
-                        w_val = w.get('weight', '0%')
-                        shares = w.get('shares', 0)
-                        price = w.get('price', 0)
-                        mv = shares * price
+                        shares_val = float(w.get('shares', 0.0) or 0.0)
+                        saved_price = float(w.get('price', 0.0) or 0.0)
+                        live_price = float(px_port[t].iloc[-1]) if has_live else saved_price
+                        w_decl = float(str(w.get('weight', '0')).replace('%', '').strip() or 0.0)
+                        mv = (shares_val * live_price) if shares_val > 0 else (base_val_fallback * (w_decl / 100.0) if w_decl > 0 else 0.0)
+                        shares_display = f"{shares_val:,.2f}"
                     else:
-                        w_val = w
-                        shares = "N/A"
-                        price = "N/A"
-                        mv = current_p['total_value'] * (float(str(w).strip('%'))/100)
-                    
-                    rows.append({
-                        "Estado": v_icon,
-                        "Activo": t,
-                        "Peso": w_val,
-                        "Acciones": f"{shares:,.2f}" if isinstance(shares, (int, float)) else shares,
-                        "Market Value": f"${mv:,.2f}" if isinstance(mv, (int, float)) else mv
+                        live_price = float(px_port[t].iloc[-1]) if has_live else 0.0
+                        w_decl = float(str(w).replace('%', '').strip() or 0.0)
+                        mv = base_val_fallback * (w_decl / 100.0)
+                        shares_display = f"{(mv / live_price):,.2f}" if live_price > 0 else "N/A"
+
+                    audit_total_mv += mv
+                    audit_items.append({
+                        "v_icon": v_icon,
+                        "ticker": t,
+                        "price": live_price,
+                        "shares_display": shares_display,
+                        "mv": mv,
+                        "w_decl": w_decl
                     })
-                
+
+                audit_cash = float(current_p.get('cash', 0.0) or 0.0)
+                audit_nav = audit_total_mv + audit_cash
+
+                rows = []
+                for item in audit_items:
+                    live_w_pct = (item['mv'] / audit_nav * 100.0) if audit_nav > 0 else item['w_decl']
+                    rows.append({
+                        "Estado": item['v_icon'],
+                        "Activo": item['ticker'],
+                        "Precio": f"${item['price']:,.2f}" if item['price'] > 0 else "N/A",
+                        "Peso": f"{live_w_pct:.2f}%",
+                        "Acciones": item['shares_display'],
+                        "Market Value": f"${item['mv']:,.2f}"
+                    })
+
+                if audit_cash > 0 or audit_nav > 0:
+                    cash_w_pct = (audit_cash / audit_nav * 100.0) if audit_nav > 0 else 0.0
+                    rows.append({
+                        "Estado": "💵",
+                        "Activo": "CASH (USD)",
+                        "Precio": "$1.00",
+                        "Peso": f"{cash_w_pct:.2f}%",
+                        "Acciones": "—",
+                        "Market Value": f"${audit_cash:,.2f}"
+                    })
+
                 df_audit = pd.DataFrame(rows)
                 st.table(df_audit)
-                st.caption("Nota: El Agente Guardián valida el estado de cada ticker en tiempo real.")
+                last_update_ts = str(current_p.get('timestamp', '')).split(".")[0]
+                st.caption(f"NAV Auditado (Tiempo Real): **${audit_nav:,.2f}** | Última consolidación: `{last_update_ts or 'N/A'}`")
                 
                 st.divider()
                 # 24H Countdown Logic
@@ -1654,7 +1716,20 @@ elif menu == "Mi Portafolio":
 
             if not px_port.empty:
                 last_prices = px_port.iloc[-1].to_dict()
-                total_nav = current_p['total_value'] + current_p.get('cash', 0.0)
+                if leader_etf not in last_prices or pd.isna(last_prices.get(leader_etf)):
+                    leader_df = get_global_data([leader_etf], st.session_state.safe_mode)
+                    if not leader_df.empty and leader_etf in leader_df.columns:
+                        last_prices[leader_etf] = float(leader_df[leader_etf].iloc[-1])
+
+                live_mv_total = 0.0
+                for t_nav, a_nav in current_p['assets'].items():
+                    if isinstance(a_nav, dict):
+                        sh_nav = float(a_nav.get('shares', 0.0) or 0.0)
+                        px_nav = float(last_prices.get(t_nav, a_nav.get('price', 0.0)) or 0.0)
+                        live_mv_total += sh_nav * px_nav
+                    else:
+                        live_mv_total += float(current_p['total_value']) * (float(str(a_nav).strip('%')) / 100.0)
+                total_nav = (live_mv_total if live_mv_total > 0 else float(current_p['total_value'])) + float(current_p.get('cash', 0.0))
 
                 # Initialize Slider Session States dynamically
                 if 'rebal_lider' not in st.session_state:
@@ -1952,6 +2027,7 @@ elif menu == "Mi Portafolio":
                                 
                                 # Guardar portafolio rebalanceado
                                 db_lib.save_portfolio(final_assets, float(total_market_v_new), float(target_cash_new), float(spy_px_new))
+                                st.session_state.portfolio_sync_id = None
                                 
                                 # Log the action on the database learning history
                                 db_lib.log_learning_insight(

@@ -179,8 +179,9 @@ def save_portfolio(assets, total_value, cash, spy_price):
     if not conn: return
     try:
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO portfolio (assets, total_value, cash, benchmark_spy_price) VALUES (?, ?, ?, ?)', 
-                       (json.dumps(assets), total_value, cash, spy_price))
+        ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        cursor.execute('INSERT INTO portfolio (timestamp, assets, total_value, cash, benchmark_spy_price) VALUES (?, ?, ?, ?, ?)', 
+                       (ts_now, json.dumps(assets), total_value, cash, spy_price))
         conn.commit()
     finally:
         conn.close()
@@ -211,7 +212,7 @@ def get_latest_portfolio():
     conn = get_db_connection()
     if not conn: return None
     try:
-        df = pd.read_sql_query("SELECT * FROM portfolio ORDER BY timestamp DESC LIMIT 1", conn)
+        df = pd.read_sql_query("SELECT * FROM portfolio ORDER BY datetime(timestamp) DESC, id DESC LIMIT 1", conn)
         if not df.empty:
             df['assets'] = df['assets'].apply(json.loads)
             return df.iloc[0].to_dict()

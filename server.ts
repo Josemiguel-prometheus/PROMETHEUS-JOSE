@@ -13,9 +13,34 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  // Initialize DB before anything else
-  await initDb();
-  const db = getDb();
+  let db!: Awaited<ReturnType<typeof initDb>>;
+  let viteMiddleware: any = null;
+
+  const initPromise = (async () => {
+    await initDb();
+    db = getDb();
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      viteMiddleware = vite.middlewares;
+    }
+  })();
+
+  initPromise.catch((err) => {
+    console.error('Fatal initialization error:', err);
+    process.exit(1);
+  });
+
+  app.use(async (_req, _res, next) => {
+    try {
+      await initPromise;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
 
   app.use(express.json());
 
@@ -864,11 +889,10 @@ Reglas de Comportamiento Técnico:
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+    app.use((req, res, next) => {
+      if (viteMiddleware) return viteMiddleware(req, res, next);
+      next();
     });
-    app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
