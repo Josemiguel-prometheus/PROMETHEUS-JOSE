@@ -1681,8 +1681,8 @@ elif menu == "Mi Portafolio":
             df_last_rec = pd.read_sql_query("SELECT analyst_report, final_recommendation FROM recommendations WHERE user_decision='ACEPTADA' ORDER BY timestamp DESC LIMIT 1", conn)
             conn.close()
 
-            # Determinar ETF líder desde la última decisión aceptada o señal 24h vigente
-            leader_etf = "XLK"
+            # Determinar ETF líder recomendado desde la última decisión aceptada o señal 24h vigente
+            auto_leader_etf = "XLK"
             if not df_last_rec.empty:
                 try:
                     rec_json = json.loads(df_last_rec.iloc[0]['final_recommendation']) if df_last_rec.iloc[0]['final_recommendation'] else {}
@@ -1694,11 +1694,11 @@ elif menu == "Mi Portafolio":
                     report_json = {}
 
                 if isinstance(report_json, dict) and report_json.get("top_etfs"):
-                    leader_etf = str(report_json["top_etfs"][0]).strip().upper()
+                    auto_leader_etf = str(report_json["top_etfs"][0]).strip().upper()
                 else:
                     recs_24h_latest = db_lib.get_recommendations_24h(1)
                     if recs_24h_latest and recs_24h_latest[0].get("sector_lider"):
-                        leader_etf = str(recs_24h_latest[0]["sector_lider"]).split()[0].strip().upper()
+                        auto_leader_etf = str(recs_24h_latest[0]["sector_lider"]).split()[0].strip().upper()
 
                 propuesta = rec_json.get('propuesta', {}) if isinstance(rec_json, dict) else {}
                 lider_pct = float(str(propuesta.get('lider', '25%')).strip('%') or 25.0)
@@ -1708,11 +1708,30 @@ elif menu == "Mi Portafolio":
             else:
                 recs_24h_latest = db_lib.get_recommendations_24h(1)
                 if recs_24h_latest and recs_24h_latest[0].get("sector_lider"):
-                    leader_etf = str(recs_24h_latest[0]["sector_lider"]).split()[0].strip().upper()
+                    auto_leader_etf = str(recs_24h_latest[0]["sector_lider"]).split()[0].strip().upper()
                 lider_pct = 30.0
                 core_pct = 50.0
                 cash_pct = 20.0
                 is_simulated = True
+
+            # Catálogo completo de Sectores ETF (GICS + Referencias Macro)
+            SECTOR_ETF_CATALOG = {
+                "XLK": "Tecnología (XLK)",
+                "XLF": "Financiero (XLF)",
+                "XLE": "Energía (XLE)",
+                "XLV": "Salud (XLV)",
+                "XLY": "Consumo Discrecional (XLY)",
+                "XLP": "Consumo Básico (XLP)",
+                "XLI": "Industrial (XLI)",
+                "XLB": "Materiales (XLB)",
+                "XLC": "Comunicación (XLC)",
+                "XLU": "Servicios Públicos (XLU)",
+                "XLRE": "Bienes Raíces (XLRE)",
+                "QQQ": "Nasdaq 100 / Tech Growth (QQQ)",
+                "IWM": "Small Caps Russell 2000 (IWM)"
+            }
+            if auto_leader_etf not in SECTOR_ETF_CATALOG:
+                SECTOR_ETF_CATALOG[auto_leader_etf] = f"Sector Recomendado ({auto_leader_etf})"
 
             # Lectura en tiempo real del régimen VIX (sin llamadas extra si ya está en px_port)
             vix_live = 18.0
@@ -1730,7 +1749,7 @@ elif menu == "Mi Portafolio":
                 vix_target_cash = 10.0
                 vix_target_hedge = 0.0
                 vix_target_leader = 35.0
-                vix_advice = "Entorno de apetito por riesgo: se favorece sobreponderación táctica en el sector líder y menor liquidez ociosa."
+                vix_advice = "Entorno de apetito por riesgo: se favorece sobreponderación táctica en los sectores líderes y menor liquidez ociosa."
             elif vix_live <= 20.0:
                 vix_regime_label = "🟡 Neutral / Equilibrado"
                 vix_regime_color = "#f59e0b"
@@ -1755,8 +1774,8 @@ elif menu == "Mi Portafolio":
                     </span>
                 </div>
                 <p style="color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; line-height: 1.5;">
-                    Calcula y ejecuta el plan de operaciones institucionales preservando tus posiciones o rotando tácticamente según el régimen macro.
-                    { "⚠️ <b>Modo Referencia:</b> Sin señal manual aceptada, usando líder 24H vigente (<b>" + leader_etf + "</b>)." if is_simulated else f"📡 <b>Sincronizado:</b> Enlace activo con señal sectorial aceptada de <b>{leader_etf}</b>."}
+                    Elige libremente entre los distintos <b>sectores ETF</b>, calibra el peso objetivo preservando tus posiciones o rotando tácticamente, y personaliza qué órdenes ejecutar.
+                    { "⚠️ <b>Señal Base 24H:</b> Sector sugerido por defecto: <b>" + auto_leader_etf + "</b>." if is_simulated else f"📡 <b>Señal Aceptada:</b> Sector sugerido: <b>{auto_leader_etf}</b>."}
                     <br><span style="color: #cbd5e1;">🧠 <b>Diagnóstico Macro VIX:</b> {vix_advice}</span>
                 </p>
             </div>
@@ -1765,37 +1784,73 @@ elif menu == "Mi Portafolio":
             if not px_port.empty:
                 px_rebal_base = px_port.loc[:, ~px_port.columns.duplicated()].copy()
 
-                # Selector de estrategia (Opción 1) y activo refugio (Opción 4)
-                cfg_col1, cfg_col2 = st.columns([2, 1])
+                # Selectores de Estrategia, Sector ETF Líder y Cobertura Macro
+                cfg_col1, cfg_col2, cfg_col3 = st.columns([1.4, 1.1, 0.9])
                 with cfg_col1:
                     rebal_mode = st.radio(
                         "Estrategia de Rebalanceo",
                         options=[
-                            "🧩 Cartera Completa (Preservar Posiciones + Líder)",
-                            "⚡ Rotación Pura (3 Bloques: Líder + SPY + Refugio/Cash)"
+                            "🧩 Cartera Completa (Preservar Posiciones + Sectores ETF)",
+                            "⚡ Rotación Pura (3 Bloques: Sector + SPY + Refugio/Cash)"
                         ],
-                        horizontal=True,
+                        horizontal=False,
                         key="rebal_mode_select"
                     )
                 with cfg_col2:
+                    sector_options = list(SECTOR_ETF_CATALOG.keys())
+                    if "rebal_leader_sector_etf" in st.session_state and st.session_state["rebal_leader_sector_etf"] not in sector_options:
+                        st.session_state["rebal_leader_sector_etf"] = auto_leader_etf if auto_leader_etf in sector_options else sector_options[0]
+                    default_sec_idx = sector_options.index(auto_leader_etf) if auto_leader_etf in sector_options else 0
+                    leader_etf = st.selectbox(
+                        "🎯 Sector ETF Líder / Principal",
+                        options=sector_options,
+                        index=default_sec_idx,
+                        format_func=lambda t: f"⭐ {SECTOR_ETF_CATALOG[t]} (Sugerido)" if t == auto_leader_etf else SECTOR_ETF_CATALOG[t],
+                        key="rebal_leader_sector_etf",
+                        help="Selecciona el sector ETF principal hacia el que deseas rotar o dar mayor peso."
+                    )
+                with cfg_col3:
+                    hedge_labels = {
+                        "TLT": "TLT — Bonos Largo Plazo",
+                        "GLD": "GLD — Oro Físico",
+                        "SHY": "SHY — Bonos Corto Plazo"
+                    }
                     hedge_etf = st.selectbox(
-                        "Activo de Cobertura Macro (Opción VIX > 20)",
-                        options=["TLT", "GLD"],
+                        "🛡️ Cobertura Macro (VIX > 20)",
+                        options=["TLT", "GLD", "SHY"],
                         index=0,
+                        format_func=lambda t: hedge_labels.get(t, t),
                         key="rebal_hedge_etf",
                         help="Activo refugio utilizado en calibraciones defensivas por VIX alto."
                     )
 
                 is_full_portfolio_mode = rebal_mode.startswith("🧩")
 
-                # Asegurar precios e históricos para todos los activos involucrados (incluyendo leader_etf y hedge_etf si faltan)
-                needed_extra = [t for t in [leader_etf, "SPY", hedge_etf] if t not in px_rebal_base.columns or pd.isna(px_rebal_base[t].iloc[-1])]
+                extra_sector_etfs = []
+                if is_full_portfolio_mode:
+                    extra_sector_options = [s for s in SECTOR_ETF_CATALOG.keys() if s != leader_etf and s != hedge_etf]
+                    if "rebal_extra_sectors_select" in st.session_state:
+                        st.session_state["rebal_extra_sectors_select"] = [
+                            s for s in st.session_state["rebal_extra_sectors_select"] if s in extra_sector_options
+                        ]
+                    extra_sector_etfs = st.multiselect(
+                        "🧩 Sectores ETF Adicionales a Incorporar (Multi-Sector)",
+                        options=extra_sector_options,
+                        default=[],
+                        format_func=lambda t: SECTOR_ETF_CATALOG.get(t, t),
+                        key="rebal_extra_sectors_select",
+                        help="Añade uno o varios ETFs sectoriales adicionales (XLF, XLE, XLV, XLU, etc.) para combinarlos en la asignación objetivo."
+                    )
+
+                # Asegurar precios e históricos para todos los ETFs seleccionados (sin duplicar llamadas)
+                selected_all_etfs = list(dict.fromkeys([leader_etf, "SPY", hedge_etf] + extra_sector_etfs))
+                needed_extra = [t for t in selected_all_etfs if t not in px_rebal_base.columns or pd.isna(px_rebal_base[t].iloc[-1])]
                 if needed_extra:
                     extra_df = get_global_data(list(dict.fromkeys(needed_extra)), st.session_state.safe_mode)
                     if not extra_df.empty:
                         extra_df = extra_df.loc[:, ~extra_df.columns.duplicated()]
                         for col_ex in extra_df.columns:
-                            if col_ex not in px_rebal_base.columns:
+                            if col_ex not in px_rebal_base.columns or px_rebal_base[col_ex].isna().all():
                                 px_rebal_base[col_ex] = extra_df[col_ex].reindex(px_rebal_base.index).ffill().bfill()
 
                 last_prices = px_rebal_base.iloc[-1].to_dict()
@@ -1839,10 +1894,12 @@ elif menu == "Mi Portafolio":
                 total_nav = (live_mv_total if live_mv_total > 0 else base_val_fallback) + current_cash_val
                 current_cash_pct = (current_cash_val / total_nav * 100.0) if total_nav > 0 else 0.0
 
-                # Lista ordenada de activos candidatos en Modo Cartera Completa
+                # Lista ordenada y única de activos candidatos en Modo Cartera Completa
                 candidate_tickers = list(dict.fromkeys(
                     [t for t in current_p['assets'].keys() if t != "CASH"]
-                    + [leader_etf, "SPY", hedge_etf]
+                    + [leader_etf]
+                    + extra_sector_etfs
+                    + ["SPY", hedge_etf]
                 ))
 
                 # Sincronizar estado inicial del rebalanceador cuando cambia el snapshot de cartera en SQLite
@@ -1864,7 +1921,7 @@ elif menu == "Mi Portafolio":
                         init_sum += w_rounded
                     st.session_state["rebal_multi_cash"] = float(max(0.0, round(100.0 - init_sum, 1)))
 
-                # Asegurar claves por si el usuario cambia hedge_etf dinámicamente
+                # Asegurar claves por si el usuario añade nuevos sectores ETF o cambia hedge_etf dinámicamente
                 for ct in candidate_tickers:
                     if f"rebal_w_{ct}" not in st.session_state:
                         w_now = (current_assets_live[ct]['mv'] / total_nav * 100.0) if (ct in current_assets_live and total_nav > 0) else 0.0
@@ -1873,36 +1930,46 @@ elif menu == "Mi Portafolio":
                     st.session_state["rebal_multi_cash"] = float(round(current_cash_pct, 1))
 
                 # --- PRESETS MACRO Y TÁCTICOS (OPCIÓN 1 + OPCIÓN 4) ---
-                st.write("**⚙️ Ajustes y Calibración Macro (VIX + Táctica)**")
+                st.write("**⚙️ Ajustes y Calibración Macro (VIX + Sectores ETF)**")
                 pcol1, pcol2, pcol3, pcol4, pcol5 = st.columns(5)
 
                 if is_full_portfolio_mode:
+                    target_sectors_group = list(dict.fromkeys([leader_etf] + [s for s in extra_sector_etfs if s != hedge_etf]))
+
                     def _apply_multi_preset(target_cash_p, leader_boost_p, hedge_p):
                         existing = [t for t in candidate_tickers if t in current_assets_live and current_assets_live[t]['mv'] > 0]
                         if not existing:
                             existing = ["SPY"]
                         remaining = max(0.0, 100.0 - target_cash_p - hedge_p)
-                        # Reservar impulso mínimo para leader_etf
-                        leader_alloc = min(remaining, leader_boost_p)
-                        rest_pool = max(0.0, remaining - leader_alloc)
-                        other_existing = [t for t in existing if t != leader_etf and t != hedge_etf]
+                        sector_pool = min(remaining, leader_boost_p)
+                        rest_pool = max(0.0, remaining - sector_pool)
+                        other_existing = [t for t in existing if t not in target_sectors_group and t != hedge_etf]
                         other_mv_sum = sum(current_assets_live[t]['mv'] for t in other_existing if t in current_assets_live)
 
-                        assigned = {}
-                        for ct in candidate_tickers:
-                            assigned[ct] = 0.0
+                        assigned = {ct: 0.0 for ct in candidate_tickers}
                         if hedge_p > 0:
                             assigned[hedge_etf] = round(hedge_p, 1)
-                        assigned[leader_etf] = round(assigned.get(leader_etf, 0.0) + leader_alloc, 1)
+
+                        # Repartir el bloque táctico sectorial entre leader_etf y sectores adicionales elegidos
+                        if target_sectors_group and sector_pool > 0:
+                            if len(target_sectors_group) == 1:
+                                assigned[target_sectors_group[0]] = round(assigned.get(target_sectors_group[0], 0.0) + sector_pool, 1)
+                            else:
+                                main_share = round(sector_pool * 0.5, 1)
+                                assigned[target_sectors_group[0]] = round(assigned.get(target_sectors_group[0], 0.0) + main_share, 1)
+                                rem_sec = max(0.0, sector_pool - main_share)
+                                each_extra = round(rem_sec / (len(target_sectors_group) - 1), 1)
+                                for es in target_sectors_group[1:]:
+                                    assigned[es] = round(assigned.get(es, 0.0) + each_extra, 1)
 
                         if other_existing and rest_pool > 0:
-                            for idx_o, ot in enumerate(other_existing):
+                            for ot in other_existing:
                                 share_ratio = (current_assets_live[ot]['mv'] / other_mv_sum) if other_mv_sum > 0 else (1.0 / len(other_existing))
                                 assigned[ot] = round(rest_pool * share_ratio, 1)
                         elif rest_pool > 0:
                             assigned["SPY"] = round(assigned.get("SPY", 0.0) + rest_pool, 1)
 
-                        # Ajuste fino de redondeo sobre CASH para cuadrar exactamente al 100.0%
+                        # Ajuste fino sobre CASH para cuadrar exactamente al 100.0%
                         non_cash_sum = round(sum(assigned.values()), 1)
                         cash_final = round(max(0.0, 100.0 - non_cash_sum), 1)
                         for ct, val_w in assigned.items():
@@ -1910,16 +1977,16 @@ elif menu == "Mi Portafolio":
                         st.session_state["rebal_multi_cash"] = float(cash_final)
 
                     with pcol1:
-                        if st.button(f"🎯 Auto VIX ({vix_live:.1f})", use_container_width=True, help="Calibra automáticamente Cash, Líder y Cobertura según el régimen VIX actual manteniendo tu cartera base."):
+                        if st.button(f"🎯 Auto VIX ({vix_live:.1f})", use_container_width=True, help="Calibra Cash, Sectores ETF elegidos y Cobertura según el régimen VIX actual."):
                             _apply_multi_preset(vix_target_cash, vix_target_leader, vix_target_hedge)
                     with pcol2:
-                        if st.button("🛡️ Defensivo", use_container_width=True, help="35% Cash + 15% Refugio + 15% Líder + resto preservado en tu cartera."):
+                        if st.button("🛡️ Defensivo", use_container_width=True, help="35% Cash + 15% Refugio + 15% Sectores ETF + resto preservado en tu cartera."):
                             _apply_multi_preset(35.0, 15.0, 15.0)
                     with pcol3:
-                        if st.button("⚖️ Moderado", use_container_width=True, help="20% Cash + 25% Líder + resto proporcional en tus activos."):
+                        if st.button("⚖️ Moderado", use_container_width=True, help="20% Cash + 25% Sectores ETF + resto proporcional en tus activos."):
                             _apply_multi_preset(20.0, 25.0, 0.0)
                     with pcol4:
-                        if st.button("🚀 Crecimiento", use_container_width=True, help="10% Cash + 40% Líder + resto en tus activos."):
+                        if st.button("🚀 Crecimiento", use_container_width=True, help="10% Cash + 40% Sectores ETF + resto en tus activos."):
                             _apply_multi_preset(10.0, 40.0, 0.0)
                     with pcol5:
                         if st.button("🔄 Pesos Actuales", use_container_width=True, help="Restablecer todos los controles a tus pesos de mercado actuales."):
@@ -1944,15 +2011,17 @@ elif menu == "Mi Portafolio":
                                 acc_b += new_b
                             st.session_state["rebal_multi_cash"] = float(max(0.0, round(100.0 - acc_b, 1)))
 
-                    # Controles interactivos para cada activo en cartera + líder + refugio + CASH
-                    st.write("**🎛️ Asignación Multi-Activo Objetivo (%)**")
+                    # Controles interactivos para cada activo en cartera + sectores ETF elegidos + refugio + CASH
+                    st.write("**🎛️ Asignación Multi-Activo y Sectorial Objetivo (%)**")
                     n_cols_grid = min(4, max(2, len(candidate_tickers) + 1))
                     grid_cols = st.columns(n_cols_grid)
                     target_pct_map = {}
                     for idx_c, ct in enumerate(candidate_tickers):
                         tag = ""
                         if ct == leader_etf:
-                            tag = " ⭐Líder"
+                            tag = " ⭐Sector Líder"
+                        elif ct in extra_sector_etfs:
+                            tag = " 🧩Sector ETF"
                         elif ct == hedge_etf:
                             tag = " 🛡️Refugio"
                         elif ct in current_assets_live:
@@ -1994,13 +2063,13 @@ elif menu == "Mi Portafolio":
                         target_pct_map = {k: v * norm_factor for k, v in target_pct_map.items()}
                         target_cash_pct = float(tune_cash_multi) * norm_factor
                     else:
-                        st.success("✅ **Balanza Cuadrada (100.0%):** Distribución multi-activo válida.")
+                        st.success("✅ **Balanza Cuadrada (100.0%):** Distribución multi-activo y sectorial válida.")
                         target_cash_pct = float(tune_cash_multi)
 
                 else:
                     # Modo Clásico (Rotación Pura 3/4 Bloques)
                     with pcol1:
-                        if st.button(f"🎯 Auto VIX ({vix_live:.1f})", use_container_width=True, help="Calibra Líder, SPY, Refugio y Cash según VIX."):
+                        if st.button(f"🎯 Auto VIX ({vix_live:.1f})", use_container_width=True, help="Calibra Sector Líder, SPY, Refugio y Cash según VIX."):
                             if vix_live < 15.0:
                                 st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 45, 45, 0, 10
                             elif vix_live <= 20.0:
@@ -2008,13 +2077,13 @@ elif menu == "Mi Portafolio":
                             else:
                                 st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 15, 35, 20, 30
                     with pcol2:
-                        if st.button("🛡️ Defensivo", use_container_width=True, help="15% Líder / 35% SPY / 15% Refugio / 35% Cash"):
+                        if st.button("🛡️ Defensivo", use_container_width=True, help="15% Sector / 35% SPY / 15% Refugio / 35% Cash"):
                             st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 15, 35, 15, 35
                     with pcol3:
-                        if st.button("⚖️ Moderado", use_container_width=True, help="30% Líder / 50% SPY / 0% Refugio / 20% Cash"):
+                        if st.button("⚖️ Moderado", use_container_width=True, help="30% Sector / 50% SPY / 0% Refugio / 20% Cash"):
                             st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 30, 50, 0, 20
                     with pcol4:
-                        if st.button("🚀 Crecimiento", use_container_width=True, help="50% Líder / 40% SPY / 0% Refugio / 10% Cash"):
+                        if st.button("🚀 Crecimiento", use_container_width=True, help="50% Sector / 40% SPY / 0% Refugio / 10% Cash"):
                             st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 50, 40, 0, 10
                     with pcol5:
                         if st.button("🔄 Propuesta", use_container_width=True, help="Restablecer a los valores de la señal de Prometheus"):
@@ -2025,7 +2094,7 @@ elif menu == "Mi Portafolio":
 
                     scol1, scol2, scol3, scol4 = st.columns(4)
                     with scol1:
-                        tune_lider = st.slider(f"Líder ({leader_etf}) (%)", 0, 100, key="rebal_lider", step=5)
+                        tune_lider = st.slider(f"Sector ({leader_etf}) (%)", 0, 100, key="rebal_lider", step=5)
                     with scol2:
                         tune_core = st.slider("Core (SPY) (%)", 0, 100, key="rebal_core", step=5)
                     with scol3:
@@ -2222,109 +2291,240 @@ elif menu == "Mi Portafolio":
                     st.write("**📋 Detalle Técnico de Desviaciones (Drift)**")
                     st.dataframe(pd.DataFrame(rebal_table_rows), use_container_width=True, hide_index=True)
 
-                # Batched Orders & Execution Section
+                # Batched Orders & Execution Section con Opciones de Elección
                 st.divider()
                 st.write("**🎟️ Plan Operativo de Órdenes a Ejecutar**")
 
+                opt_ord_col1, opt_ord_col2, opt_ord_col3 = st.columns([1.4, 1.0, 1.0])
+                with opt_ord_col1:
+                    exec_mode = st.selectbox(
+                        "Opciones de Ejecución de Órdenes",
+                        options=[
+                            "🔄 Ejecutar Todas las Órdenes",
+                            "🟢 Solo Compras (Desplegar Caja)",
+                            "🔴 Solo Ventas (Generar Liquidez)",
+                            "☑️ Selección Manual por Activo"
+                        ],
+                        key="rebal_exec_mode",
+                        help="Elige si deseas ejecutar el rebalanceo completo, filtrar solo compras/ventas o marcar manualmente qué órdenes ejecutar."
+                    )
+                with opt_ord_col2:
+                    share_lot_mode = st.selectbox(
+                        "Formato de Acciones",
+                        options=[
+                            "Fraccionadas (Peso Exacto)",
+                            "Enteras (Lotes Completos)"
+                        ],
+                        key="rebal_share_lot_mode",
+                        help="Las acciones enteras redondean cada orden a unidades completas dejando el remanente en CASH."
+                    )
+                with opt_ord_col3:
+                    min_order_usd = st.selectbox(
+                        "Filtro Mínimo por Orden ($)",
+                        options=[0, 100, 250, 500, 1000],
+                        index=0,
+                        format_func=lambda v: "Sin filtro ($0)" if v == 0 else f"Mínimo ${v:,}",
+                        key="rebal_min_order_usd",
+                        help="Omite automáticamente órdenes pequeñas por debajo del importe seleccionado para evitar comisiones innecesarias."
+                    )
+
+                is_integer_lots = share_lot_mode.startswith("Enteras")
                 orders_sorted = sorted(orders, key=lambda x: x['shares_to_buy'])
+                evaluated_orders = []
 
                 col_ord1, col_ord2 = st.columns([2, 1])
                 with col_ord1:
-                    has_pending_actions = False
+                    has_any_order_candidate = False
                     for o in orders_sorted:
                         if abs(o['shares_to_buy']) < 0.01:
                             continue
-                        has_pending_actions = True
+                        has_any_order_candidate = True
+
+                        if is_integer_lots:
+                            int_qty = int(abs(o['diff_abs']) // o['price']) if o['price'] > 0 else 0
+                            eff_shares_diff = float(int_qty if o['diff_abs'] >= 0 else -int_qty)
+                            eff_diff_val = eff_shares_diff * o['price']
+                        else:
+                            eff_shares_diff = float(o['shares_to_buy'])
+                            eff_diff_val = float(o['diff_abs'])
+
+                        # Limitar venta a las acciones disponibles reales
+                        if eff_shares_diff < 0:
+                            eff_shares_diff = max(-o['shares_curr'], eff_shares_diff)
+                            eff_diff_val = eff_shares_diff * o['price']
+
                         action = "COMPRAR" if o['shares_to_buy'] > 0 else "VENDER"
                         icon = "🟢" if action == "COMPRAR" else "🔴"
-                        status_word = "Adición de posición institucional" if action == "COMPRAR" else "Optimización y venta de excedentes"
-                        border_color = "#34d399" if action == "COMPRAR" else "#ef4444"
+
+                        passes_lot = abs(eff_shares_diff) >= (1.0 if is_integer_lots else 0.01)
+                        passes_min = abs(eff_diff_val) >= float(min_order_usd)
+
+                        skip_reason = ""
+                        if not passes_lot:
+                            is_selected = False
+                            skip_reason = "Omitida (< 1 acción entera)"
+                        elif not passes_min:
+                            is_selected = False
+                            skip_reason = f"Omitida (< mínimo ${min_order_usd:,})"
+                        elif exec_mode.startswith("🔄"):
+                            is_selected = True
+                        elif exec_mode.startswith("🟢"):
+                            is_selected = (eff_shares_diff > 0)
+                            if not is_selected:
+                                skip_reason = "Omitida (filtro Solo Compras)"
+                        elif exec_mode.startswith("🔴"):
+                            is_selected = (eff_shares_diff < 0)
+                            if not is_selected:
+                                skip_reason = "Omitida (filtro Solo Ventas)"
+                        else:
+                            manual_checked = st.checkbox(
+                                f"Incluir orden: {action} {o['ticker']} ({int(abs(eff_shares_diff)) if is_integer_lots else f'{abs(eff_shares_diff):.2f}'} accs | ${abs(eff_diff_val):,.2f})",
+                                value=True,
+                                key=f"rebal_manual_chk_{o['ticker']}"
+                            )
+                            is_selected = bool(manual_checked)
+                            if not is_selected:
+                                skip_reason = "Desmarcada manualmente"
+
+                        o_eval = dict(o)
+                        o_eval["eff_shares_diff"] = eff_shares_diff
+                        o_eval["eff_diff_val"] = eff_diff_val
+                        o_eval["is_selected"] = is_selected
+                        evaluated_orders.append(o_eval)
+
+                        qty_display = f"{int(abs(eff_shares_diff))}" if is_integer_lots else f"{abs(eff_shares_diff):.2f}"
+                        post_val_preview = o['current_val'] + eff_diff_val if is_selected else o['current_val']
+                        post_pct_preview = (post_val_preview / total_nav * 100.0) if total_nav > 0 else 0.0
+
+                        if is_selected:
+                            border_color = "#34d399" if action == "COMPRAR" else "#ef4444"
+                            badge_html = "<span style='color:#34d399; font-weight:bold;'>✅ EN COLA</span>"
+                            card_opacity = "1.0"
+                        else:
+                            border_color = "#475569"
+                            badge_html = f"<span style='color:#94a3b8;'>⏭️ {skip_reason}</span>"
+                            card_opacity = "0.62"
+
+                        sector_tag_label = SECTOR_ETF_CATALOG.get(o['ticker'], "")
+                        sector_sub = f" <span style='color:#94a3b8; font-weight:normal;'>({sector_tag_label})</span>" if sector_tag_label else ""
 
                         st.markdown(f"""
-                        <div style="background-color: #0c0c14; padding: 14px; border-radius: 6px; margin-bottom: 10px; border-left: 5px solid {border_color}; border-right: 1px solid #1e1b4b; border-top: 1px solid #1e1b4b; border-bottom: 1px solid #1e1b4b;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="font-size: 14px; font-weight: bold; color: {border_color};">{icon} {action} {o['ticker']}</span>
-                                <span style="font-size: 11px; color: #64748b; font-family: monospace;">{status_word}</span>
+                        <div style="background-color: #0c0c14; opacity: {card_opacity}; padding: 14px; border-radius: 6px; margin-bottom: 10px; border-left: 5px solid {border_color}; border-right: 1px solid #1e1b4b; border-top: 1px solid #1e1b4b; border-bottom: 1px solid #1e1b4b;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 14px; font-weight: bold; color: {border_color};">{icon} {action} {o['ticker']}{sector_sub}</span>
+                                <span style="font-size: 11px; font-family: monospace;">{badge_html}</span>
                             </div>
                             <div style="margin-top: 6px; font-size: 12.5px; color: #cbd5e1; line-height: 1.4;">
-                                <b>Operación:</b> Acciones aprox: {abs(o['shares_to_buy']):.2f} @ ${o['price']:.2f} | <b>Efectivo Neto:</b> ${abs(o['diff_abs']):,.2f}<br>
-                                <b>Transición de Peso:</b> {o['current_pct']} → <span style="color: #f97316; font-weight: bold;">{o['target_pct']}</span>
+                                <b>Operación:</b> Acciones: {qty_display} @ ${o['price']:.2f} | <b>Efectivo Neto:</b> ${abs(eff_diff_val):,.2f}<br>
+                                <b>Transición de Peso:</b> {o['current_pct']} → <span style="color: #f97316; font-weight: bold;">{post_pct_preview:.2f}%</span>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
 
-                    target_cash_val = total_nav * (target_cash_pct / 100.0)
-                    diff_cash = target_cash_val - current_cash_val
+                    # Calcular el efecto real en posiciones y caja según las órdenes seleccionadas
+                    selected_orders = [oe for oe in evaluated_orders if oe["is_selected"]]
+                    selected_map = {oe["ticker"]: oe for oe in selected_orders}
+
+                    projected_assets = {}
+                    projected_mv_total = 0.0
+                    real_mv_delta_total = 0.0
+
+                    for tk_p in all_involved_tickers:
+                        curr_i = current_assets_live.get(tk_p, {"shares": 0.0, "price": 0.0, "mv": 0.0})
+                        px_p = float(last_prices.get(tk_p, 0.0) or curr_i["price"] or 0.0)
+                        if tk_p in selected_map:
+                            o_sel = selected_map[tk_p]
+                            final_sh = max(0.0, curr_i["shares"] + o_sel["eff_shares_diff"])
+                            final_px = o_sel["price"]
+                            final_mv = final_sh * final_px
+                        else:
+                            final_sh = curr_i["shares"]
+                            final_px = px_p
+                            final_mv = curr_i["mv"]
+
+                        real_mv_delta_total += (final_mv - curr_i["mv"])
+                        if final_sh > 0.0001 and final_mv > 0.01:
+                            projected_assets[tk_p] = {
+                                "shares": float(final_sh),
+                                "price": float(final_px),
+                                "mv": float(final_mv)
+                            }
+                            projected_mv_total += final_mv
+
+                    projected_cash_val = current_cash_val - real_mv_delta_total
+                    cash_sufficient = projected_cash_val >= -0.01
+                    projected_cash_clean = max(0.0, projected_cash_val)
+                    projected_nav_clean = projected_mv_total + projected_cash_clean
+                    projected_cash_pct = (projected_cash_clean / projected_nav_clean * 100.0) if projected_nav_clean > 0 else 0.0
+                    diff_cash_real = projected_cash_clean - current_cash_val
 
                     st.markdown(f"""
                     <div style="background-color: #0d1527; padding: 12px; border-radius: 6px; border: 1px solid #1e293b; margin-top: 10px;">
-                        <span style="font-size: 13.5px; font-weight: bold; color: #60a5fa;">💵 Modificación Neta en Efectivo (Caja)</span><br>
+                        <span style="font-size: 13.5px; font-weight: bold; color: #60a5fa;">💵 Impacto Neto en Efectivo según Selección</span><br>
                         <span style="font-size: 12px; color: #94a3b8;">
                             Caja Actual: ${current_cash_val:,.2f} ({current_cash_pct:.1f}%) | 
-                            Caja Objetivo: ${target_cash_val:,.2f} ({target_cash_pct:.1f}%)<br>
-                            Flujo Neto de Efectivo Requerido: <b>{'+' if diff_cash >= 0 else ''}${diff_cash:,.2f}</b>
+                            Caja Resultante: ${projected_cash_clean:,.2f} ({projected_cash_pct:.1f}%)<br>
+                            Flujo Neto de Caja: <b>{'+' if diff_cash_real >= 0 else ''}${diff_cash_real:,.2f}</b>
                         </span>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    if not has_pending_actions:
+                    if not has_any_order_candidate:
                         st.success("✅ **Portafolio en Línea:** El portafolio actual coincide perfectamente con la asignación configurada.")
 
                 with col_ord2:
                     st.markdown('<div class="metric-card" style="border-top: 4px solid #f97316; padding: 18px; background-color: #0c0c0f; border-radius: 6px; border-left: 1px solid #1b1b22; border-right: 1px solid #1b1b22; border-bottom: 1px solid #1b1b22;">', unsafe_allow_html=True)
                     st.markdown("<h4 style='color:#f97316; margin-top:0;'>🔒 Consolidación Institucional</h4>", unsafe_allow_html=True)
-                    st.caption("Al confirmar, Prometheus recalculará las acciones, ajustará el saldo de caja y actualizará automáticamente el Dashboard, Auditoría y Riesgo.")
+                    st.caption("Al confirmar, Prometheus ejecutará únicamente las órdenes activadas en tu plan y actualizará Dashboard, Auditoría y Riesgo.")
 
                     st.divider()
 
-                    total_vol_trade = sum([abs(o['diff_abs']) for o in orders])
-                    est_commission = total_vol_trade * 0.001
+                    selected_vol_trade = sum(abs(oe["eff_diff_val"]) for oe in selected_orders)
+                    est_commission = selected_vol_trade * 0.001
                     efficiency_score = max(0, 100 - (portfolio_drift_index * 0.5))
 
-                    st.write(f"**Volumen Total Negociado:** ${total_vol_trade:,.2f}")
+                    st.write(f"**Órdenes Activas:** {len(selected_orders)} de {len(evaluated_orders)}")
+                    st.write(f"**Volumen a Negociar:** ${selected_vol_trade:,.2f}")
                     st.write(f"**Comisiones Est. (0.1%):** ${est_commission:,.2f}")
                     st.write(f"**Score de Eficiencia:** {efficiency_score:.1f}/100")
 
                     if not is_balanced_100:
                         st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True, disabled=True, help="Corrige los pesos para sumar exactamente 100% primero.")
+                    elif len(selected_orders) == 0:
+                        st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True, disabled=True, help="No hay órdenes seleccionadas para ejecutar.")
+                    elif not cash_sufficient:
+                        st.error(f"⛔ Caja insuficiente (déficit de ${abs(projected_cash_val):,.2f}). Incluye ventas o reduce compras.")
+                        st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True, disabled=True)
                     else:
                         if st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True, key="btn_ejecuta_rebalanceo_new"):
-                            with st.spinner("Ejecutando operaciones en el core de datos..."):
+                            with st.spinner("Ejecutando operaciones seleccionadas en el core de datos..."):
                                 final_assets = {}
-                                total_market_v_new = 0.0
+                                for tk_f, item_f in projected_assets.items():
+                                    w_final = (item_f["mv"] / projected_nav_clean * 100.0) if projected_nav_clean > 0 else 0.0
+                                    final_assets[tk_f] = {
+                                        "weight": f"{w_final:.2f}%",
+                                        "shares": float(item_f["shares"]),
+                                        "price": float(item_f["price"])
+                                    }
 
-                                for o in orders:
-                                    o_target_pct = float(o['target_pct_num'])
-                                    if o_target_pct > 0:
-                                        target_val_new = total_nav * (o_target_pct / 100.0)
-                                        price_curr = float(o['price'])
-                                        new_sh_count = target_val_new / price_curr if price_curr > 0 else 0.0
-
-                                        final_assets[o['ticker']] = {
-                                            "weight": f"{o_target_pct:.2f}%",
-                                            "shares": float(new_sh_count),
-                                            "price": float(price_curr)
-                                        }
-                                        total_market_v_new += target_val_new
-
-                                target_cash_new = total_nav * (target_cash_pct / 100.0)
                                 raw_spy_px = last_prices.get('SPY', 450.0)
                                 spy_px_new = float(raw_spy_px) if (raw_spy_px is not None and pd.notna(raw_spy_px) and float(raw_spy_px) > 0) else 450.0
 
-                                db_lib.save_portfolio(final_assets, float(total_market_v_new), float(target_cash_new), float(spy_px_new))
+                                db_lib.save_portfolio(final_assets, float(projected_mv_total), float(projected_cash_clean), float(spy_px_new))
                                 st.session_state.portfolio_sync_id = None
                                 st.session_state.rebal_sync_token = None
 
                                 mode_tag = "Cartera Completa" if is_full_portfolio_mode else "Rotación Pura"
                                 beta_note = f" Beta: {pre_beta:.2f} -> {post_beta:.2f}." if has_risk_preview else ""
+                                sectors_used = ", ".join(list(dict.fromkeys([leader_etf] + extra_sector_etfs)))
                                 db_lib.log_learning_insight(
                                     "USER",
-                                    f"Rebalanceo [{mode_tag}] ejecutado bajo VIX {vix_live:.2f}. Drift inicial {portfolio_drift_index:.1f}% -> 0.0%. Volumen: ${total_vol_trade:,.2f}.{beta_note}",
+                                    f"Rebalanceo [{mode_tag} | Sectores: {sectors_used} | {exec_mode}] ejecutado bajo VIX {vix_live:.2f}. {len(selected_orders)} órdenes, volumen: ${selected_vol_trade:,.2f}.{beta_note}",
                                     "HIGH",
                                     True
                                 )
 
-                                st.success("¡Plan de Rebalanceo ejecutado con éxito! Cartera y Auditoría sincronizadas.")
+                                st.success("¡Órdenes ejecutadas con éxito! Cartera y Auditoría sincronizadas.")
                                 st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
