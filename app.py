@@ -1681,155 +1681,413 @@ elif menu == "Mi Portafolio":
             df_last_rec = pd.read_sql_query("SELECT analyst_report, final_recommendation FROM recommendations WHERE user_decision='ACEPTADA' ORDER BY timestamp DESC LIMIT 1", conn)
             conn.close()
 
-            # Identify target proposal weights
+            # Determinar ETF líder desde la última decisión aceptada o señal 24h vigente
+            leader_etf = "XLK"
             if not df_last_rec.empty:
-                rec_json = json.loads(df_last_rec.iloc[0]['final_recommendation']) if df_last_rec.iloc[0]['final_recommendation'] else {}
-                report_json = json.loads(df_last_rec.iloc[0]['analyst_report']) if df_last_rec.iloc[0]['analyst_report'] else {}
-                
-                # Extract Top ETF (the leader)
-                leader_etf = "XLK" # Default fallback
-                if report_json and "top_etfs" in report_json and report_json["top_etfs"]:
-                    leader_etf = report_json["top_etfs"][0]
-                
-                propuesta = rec_json.get('propuesta', {})
-                lider_pct = float(str(propuesta.get('lider', '25%')).strip('%'))
-                core_pct = float(str(propuesta.get('core', '50%')).strip('%'))
-                cash_pct = float(str(propuesta.get('cash', '25%')).strip('%'))
+                try:
+                    rec_json = json.loads(df_last_rec.iloc[0]['final_recommendation']) if df_last_rec.iloc[0]['final_recommendation'] else {}
+                except Exception:
+                    rec_json = {}
+                try:
+                    report_json = json.loads(df_last_rec.iloc[0]['analyst_report']) if df_last_rec.iloc[0]['analyst_report'] else {}
+                except Exception:
+                    report_json = {}
+
+                if isinstance(report_json, dict) and report_json.get("top_etfs"):
+                    leader_etf = str(report_json["top_etfs"][0]).strip().upper()
+                else:
+                    recs_24h_latest = db_lib.get_recommendations_24h(1)
+                    if recs_24h_latest and recs_24h_latest[0].get("sector_lider"):
+                        leader_etf = str(recs_24h_latest[0]["sector_lider"]).split()[0].strip().upper()
+
+                propuesta = rec_json.get('propuesta', {}) if isinstance(rec_json, dict) else {}
+                lider_pct = float(str(propuesta.get('lider', '25%')).strip('%') or 25.0)
+                core_pct = float(str(propuesta.get('core', '50%')).strip('%') or 50.0)
+                cash_pct = float(str(propuesta.get('cash', '25%')).strip('%') or 25.0)
                 is_simulated = False
             else:
-                # Fallback default proposal if none has been accepted
-                leader_etf = "XLK"
+                recs_24h_latest = db_lib.get_recommendations_24h(1)
+                if recs_24h_latest and recs_24h_latest[0].get("sector_lider"):
+                    leader_etf = str(recs_24h_latest[0]["sector_lider"]).split()[0].strip().upper()
                 lider_pct = 30.0
                 core_pct = 50.0
                 cash_pct = 20.0
                 is_simulated = True
 
+            # Lectura en tiempo real del régimen VIX (sin llamadas extra si ya está en px_port)
+            vix_live = 18.0
+            if not px_port.empty and '^VIX' in px_port.columns and pd.notna(px_port['^VIX'].iloc[-1]):
+                vix_live = float(px_port['^VIX'].iloc[-1])
+            elif isinstance(resumen_g, dict) and resumen_g.get('vix') is not None:
+                try:
+                    vix_live = float(resumen_g.get('vix', 18.0))
+                except (TypeError, ValueError):
+                    vix_live = 18.0
+
+            if vix_live < 15.0:
+                vix_regime_label = "🟢 Expansivo (Baja Volatilidad)"
+                vix_regime_color = "#10b981"
+                vix_target_cash = 10.0
+                vix_target_hedge = 0.0
+                vix_target_leader = 35.0
+                vix_advice = "Entorno de apetito por riesgo: se favorece sobreponderación táctica en el sector líder y menor liquidez ociosa."
+            elif vix_live <= 20.0:
+                vix_regime_label = "🟡 Neutral / Equilibrado"
+                vix_regime_color = "#f59e0b"
+                vix_target_cash = 20.0
+                vix_target_hedge = 0.0
+                vix_target_leader = 25.0
+                vix_advice = "Volatilidad moderada: mantener núcleo equilibrado con 20% de liquidez táctica de maniobra."
+            else:
+                vix_regime_label = "🔴 Defensivo / Alta Volatilidad"
+                vix_regime_color = "#ef4444"
+                vix_target_cash = 30.0
+                vix_target_hedge = 15.0
+                vix_target_leader = 15.0
+                vix_advice = "Estrés de volatilidad elevado (VIX > 20): se recomienda ampliar colchón de CASH (30%) y activar cobertura defensiva."
+
             st.markdown(f"""
-            <div style="background-color: #0b0b14; padding: 18px; border-radius: 6px; border: 1px solid #1e1b4b; margin-bottom: 20px;">
-                <h3 style="color: #60a5fa; margin-top: 0; margin-bottom: 6px; font-weight: 600;">⚖️ Motor Avanzado de Rebalanceo Dinámico de Activos</h3>
-                <p style="color: #94a3b8; font-size: 13px; margin: 0; line-height: 1.5;">
-                    Calcola y ejecuta el plan de operaciones institucionales para optimizar la dispersión operativa de tu cartera. 
-                    { "⚠️ <b>Modo Simulación Activo:</b> No hay señales aceptadas en memoria, mostrando configuración institucional equilibrada." if is_simulated else f"📡 <b>Sincronizado:</b> Enlace activo con señal de rotación sectorial aceptada de <b>{leader_etf}</b>."}
+            <div style="background-color: #0b0b14; padding: 18px; border-radius: 6px; border: 1px solid #1e1b4b; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <h3 style="color: #60a5fa; margin: 0; font-weight: 600;">⚖️ Motor Avanzado de Rebalanceo Dinámico de Activos</h3>
+                    <span style="background-color: #111827; border: 1px solid {vix_regime_color}; color: {vix_regime_color}; font-size: 11.5px; padding: 4px 10px; border-radius: 999px; font-family: monospace; font-weight: bold;">
+                        VIX {vix_live:.2f} • {vix_regime_label}
+                    </span>
+                </div>
+                <p style="color: #94a3b8; font-size: 13px; margin: 8px 0 0 0; line-height: 1.5;">
+                    Calcula y ejecuta el plan de operaciones institucionales preservando tus posiciones o rotando tácticamente según el régimen macro.
+                    { "⚠️ <b>Modo Referencia:</b> Sin señal manual aceptada, usando líder 24H vigente (<b>" + leader_etf + "</b>)." if is_simulated else f"📡 <b>Sincronizado:</b> Enlace activo con señal sectorial aceptada de <b>{leader_etf}</b>."}
+                    <br><span style="color: #cbd5e1;">🧠 <b>Diagnóstico Macro VIX:</b> {vix_advice}</span>
                 </p>
             </div>
             """, unsafe_allow_html=True)
 
             if not px_port.empty:
-                last_prices = px_port.iloc[-1].to_dict()
-                if leader_etf not in last_prices or pd.isna(last_prices.get(leader_etf)):
-                    leader_df = get_global_data([leader_etf], st.session_state.safe_mode)
-                    if not leader_df.empty and leader_etf in leader_df.columns:
-                        last_prices[leader_etf] = float(leader_df[leader_etf].iloc[-1])
+                px_rebal_base = px_port.loc[:, ~px_port.columns.duplicated()].copy()
 
+                # Selector de estrategia (Opción 1) y activo refugio (Opción 4)
+                cfg_col1, cfg_col2 = st.columns([2, 1])
+                with cfg_col1:
+                    rebal_mode = st.radio(
+                        "Estrategia de Rebalanceo",
+                        options=[
+                            "🧩 Cartera Completa (Preservar Posiciones + Líder)",
+                            "⚡ Rotación Pura (3 Bloques: Líder + SPY + Refugio/Cash)"
+                        ],
+                        horizontal=True,
+                        key="rebal_mode_select"
+                    )
+                with cfg_col2:
+                    hedge_etf = st.selectbox(
+                        "Activo de Cobertura Macro (Opción VIX > 20)",
+                        options=["TLT", "GLD"],
+                        index=0,
+                        key="rebal_hedge_etf",
+                        help="Activo refugio utilizado en calibraciones defensivas por VIX alto."
+                    )
+
+                is_full_portfolio_mode = rebal_mode.startswith("🧩")
+
+                # Asegurar precios e históricos para todos los activos involucrados (incluyendo leader_etf y hedge_etf si faltan)
+                needed_extra = [t for t in [leader_etf, "SPY", hedge_etf] if t not in px_rebal_base.columns or pd.isna(px_rebal_base[t].iloc[-1])]
+                if needed_extra:
+                    extra_df = get_global_data(list(dict.fromkeys(needed_extra)), st.session_state.safe_mode)
+                    if not extra_df.empty:
+                        extra_df = extra_df.loc[:, ~extra_df.columns.duplicated()]
+                        for col_ex in extra_df.columns:
+                            if col_ex not in px_rebal_base.columns:
+                                px_rebal_base[col_ex] = extra_df[col_ex].reindex(px_rebal_base.index).ffill().bfill()
+
+                last_prices = px_rebal_base.iloc[-1].to_dict()
+
+                # Calcular valoración viva actual de cada posición (soportando carteras con shares > 0 o pesos %)
+                base_val_fallback = float(current_p.get('total_value', 100000.0) or 100000.0)
+                current_cash_val = float(current_p.get('cash', 0.0) or 0.0)
+                current_assets_live = {}
                 live_mv_total = 0.0
+
                 for t_nav, a_nav in current_p['assets'].items():
+                    if t_nav == "CASH":
+                        continue
+                    raw_px = last_prices.get(t_nav)
+                    live_px = float(raw_px) if (raw_px is not None and pd.notna(raw_px) and float(raw_px) > 0) else 0.0
+
                     if isinstance(a_nav, dict):
+                        if live_px == 0.0:
+                            live_px = float(a_nav.get('price', 0.0) or 0.0)
                         sh_nav = float(a_nav.get('shares', 0.0) or 0.0)
-                        px_nav = float(last_prices.get(t_nav, a_nav.get('price', 0.0)) or 0.0)
-                        live_mv_total += sh_nav * px_nav
+                        w_decl = float(str(a_nav.get('weight', '0')).replace('%', '').strip() or 0.0)
+                        if sh_nav > 0 and live_px > 0:
+                            mv_nav = sh_nav * live_px
+                        elif w_decl > 0:
+                            mv_nav = base_val_fallback * (w_decl / 100.0)
+                            sh_nav = (mv_nav / live_px) if live_px > 0 else 0.0
+                        else:
+                            mv_nav = 0.0
                     else:
-                        live_mv_total += float(current_p['total_value']) * (float(str(a_nav).strip('%')) / 100.0)
-                total_nav = (live_mv_total if live_mv_total > 0 else float(current_p['total_value'])) + float(current_p.get('cash', 0.0))
+                        w_decl = float(str(a_nav).replace('%', '').strip() or 0.0)
+                        mv_nav = base_val_fallback * (w_decl / 100.0)
+                        sh_nav = (mv_nav / live_px) if live_px > 0 else 0.0
 
-                # Initialize Slider Session States dynamically
-                if 'rebal_lider' not in st.session_state:
-                    st.session_state['rebal_lider'] = int(lider_pct)
-                if 'rebal_core' not in st.session_state:
-                    st.session_state['rebal_core'] = int(core_pct)
-                if 'rebal_cash' not in st.session_state:
-                    st.session_state['rebal_cash'] = int(cash_pct)
-
-                # Presets Layout
-                st.write("**⚙️ Ajustes de Distribución Táctica**")
-                pcol1, pcol2, pcol3, pcol4 = st.columns(4)
-                with pcol1:
-                    if st.button("🛡️ Distribución Defensiva", use_container_width=True, help="15% Sector Líder / 45% SPY / 40% Cash"):
-                        st.session_state['rebal_lider'] = 15
-                        st.session_state['rebal_core'] = 45
-                        st.session_state['rebal_cash'] = 40
-                with pcol2:
-                    if st.button("⚖️ Distribución Moderada", use_container_width=True, help="30% Sector Líder / 50% SPY / 20% Cash"):
-                        st.session_state['rebal_lider'] = 30
-                        st.session_state['rebal_core'] = 50
-                        st.session_state['rebal_cash'] = 20
-                with pcol3:
-                    if st.button("🚀 Distribución Crecimiento", use_container_width=True, help="50% Sector Líder / 40% SPY / 10% Cash"):
-                        st.session_state['rebal_lider'] = 50
-                        st.session_state['rebal_core'] = 40
-                        st.session_state['rebal_cash'] = 10
-                with pcol4:
-                    if st.button("🔄 Resetear a Propuesta", use_container_width=True, help="Restablecer a los valores calculados por Prometheus"):
-                        st.session_state['rebal_lider'] = int(lider_pct)
-                        st.session_state['rebal_core'] = int(core_pct)
-                        st.session_state['rebal_cash'] = int(cash_pct)
-
-                # Interactive Sliders for Customization
-                scol1, scol2, scol3 = st.columns(3)
-                with scol1:
-                    tune_lider = st.slider(f"Sobreponderación Líder ({leader_etf}) (%)", 0, 100, key="rebal_lider", step=5)
-                with scol2:
-                    tune_core = st.slider("Core Portfolio (SPY) (%)", 0, 100, key="rebal_core", step=5)
-                with scol3:
-                    tune_cash = st.slider("Colchón de Efectivo (CASH) (%)", 0, 100, key="rebal_cash", step=5)
-
-                sum_pcts = tune_lider + tune_core + tune_cash
-                if sum_pcts != 100:
-                    st.error(f"⚠️ **Incompatibilidad de distribución:** La suma de las ponderaciones de rebalanceo debe ser exactamente 100%. Actualmente suma **{sum_pcts}%**.")
-                    st.caption("Ajusta los sliders para corregir la balanza o selecciona uno de los perfiles rápidos arriba.")
-                    # Fallback to keep running calculations dynamically by normalizing temporarily
-                    norm_factor = 100.0 / sum_pcts if sum_pcts > 0 else 1.0
-                    target_pct_map = {
-                        leader_etf: tune_lider * norm_factor,
-                        "SPY": tune_core * norm_factor
+                    current_assets_live[t_nav] = {
+                        "shares": sh_nav,
+                        "price": live_px,
+                        "mv": mv_nav
                     }
-                    target_cash_pct = tune_cash * norm_factor
+                    live_mv_total += mv_nav
+
+                total_nav = (live_mv_total if live_mv_total > 0 else base_val_fallback) + current_cash_val
+                current_cash_pct = (current_cash_val / total_nav * 100.0) if total_nav > 0 else 0.0
+
+                # Lista ordenada de activos candidatos en Modo Cartera Completa
+                candidate_tickers = list(dict.fromkeys(
+                    [t for t in current_p['assets'].keys() if t != "CASH"]
+                    + [leader_etf, "SPY", hedge_etf]
+                ))
+
+                # Sincronizar estado inicial del rebalanceador cuando cambia el snapshot de cartera en SQLite
+                rebal_sync_token = (current_p.get('id'), current_p.get('timestamp'))
+                if st.session_state.get('rebal_sync_token') != rebal_sync_token:
+                    st.session_state['rebal_sync_token'] = rebal_sync_token
+                    # Inicializar Modo Clásico
+                    st.session_state['rebal_lider'] = int(round(lider_pct))
+                    st.session_state['rebal_core'] = int(round(core_pct))
+                    st.session_state['rebal_hedge_classic'] = 0
+                    st.session_state['rebal_cash'] = int(round(cash_pct))
+
+                    # Inicializar Modo Cartera Completa con los pesos vivos actuales (para preservar posiciones)
+                    init_sum = 0.0
+                    for ct in candidate_tickers:
+                        w_now = (current_assets_live[ct]['mv'] / total_nav * 100.0) if (ct in current_assets_live and total_nav > 0) else 0.0
+                        w_rounded = round(w_now, 1)
+                        st.session_state[f"rebal_w_{ct}"] = float(w_rounded)
+                        init_sum += w_rounded
+                    st.session_state["rebal_multi_cash"] = float(max(0.0, round(100.0 - init_sum, 1)))
+
+                # Asegurar claves por si el usuario cambia hedge_etf dinámicamente
+                for ct in candidate_tickers:
+                    if f"rebal_w_{ct}" not in st.session_state:
+                        w_now = (current_assets_live[ct]['mv'] / total_nav * 100.0) if (ct in current_assets_live and total_nav > 0) else 0.0
+                        st.session_state[f"rebal_w_{ct}"] = float(round(w_now, 1))
+                if "rebal_multi_cash" not in st.session_state:
+                    st.session_state["rebal_multi_cash"] = float(round(current_cash_pct, 1))
+
+                # --- PRESETS MACRO Y TÁCTICOS (OPCIÓN 1 + OPCIÓN 4) ---
+                st.write("**⚙️ Ajustes y Calibración Macro (VIX + Táctica)**")
+                pcol1, pcol2, pcol3, pcol4, pcol5 = st.columns(5)
+
+                if is_full_portfolio_mode:
+                    def _apply_multi_preset(target_cash_p, leader_boost_p, hedge_p):
+                        existing = [t for t in candidate_tickers if t in current_assets_live and current_assets_live[t]['mv'] > 0]
+                        if not existing:
+                            existing = ["SPY"]
+                        remaining = max(0.0, 100.0 - target_cash_p - hedge_p)
+                        # Reservar impulso mínimo para leader_etf
+                        leader_alloc = min(remaining, leader_boost_p)
+                        rest_pool = max(0.0, remaining - leader_alloc)
+                        other_existing = [t for t in existing if t != leader_etf and t != hedge_etf]
+                        other_mv_sum = sum(current_assets_live[t]['mv'] for t in other_existing if t in current_assets_live)
+
+                        assigned = {}
+                        for ct in candidate_tickers:
+                            assigned[ct] = 0.0
+                        if hedge_p > 0:
+                            assigned[hedge_etf] = round(hedge_p, 1)
+                        assigned[leader_etf] = round(assigned.get(leader_etf, 0.0) + leader_alloc, 1)
+
+                        if other_existing and rest_pool > 0:
+                            for idx_o, ot in enumerate(other_existing):
+                                share_ratio = (current_assets_live[ot]['mv'] / other_mv_sum) if other_mv_sum > 0 else (1.0 / len(other_existing))
+                                assigned[ot] = round(rest_pool * share_ratio, 1)
+                        elif rest_pool > 0:
+                            assigned["SPY"] = round(assigned.get("SPY", 0.0) + rest_pool, 1)
+
+                        # Ajuste fino de redondeo sobre CASH para cuadrar exactamente al 100.0%
+                        non_cash_sum = round(sum(assigned.values()), 1)
+                        cash_final = round(max(0.0, 100.0 - non_cash_sum), 1)
+                        for ct, val_w in assigned.items():
+                            st.session_state[f"rebal_w_{ct}"] = float(val_w)
+                        st.session_state["rebal_multi_cash"] = float(cash_final)
+
+                    with pcol1:
+                        if st.button(f"🎯 Auto VIX ({vix_live:.1f})", use_container_width=True, help="Calibra automáticamente Cash, Líder y Cobertura según el régimen VIX actual manteniendo tu cartera base."):
+                            _apply_multi_preset(vix_target_cash, vix_target_leader, vix_target_hedge)
+                    with pcol2:
+                        if st.button("🛡️ Defensivo", use_container_width=True, help="35% Cash + 15% Refugio + 15% Líder + resto preservado en tu cartera."):
+                            _apply_multi_preset(35.0, 15.0, 15.0)
+                    with pcol3:
+                        if st.button("⚖️ Moderado", use_container_width=True, help="20% Cash + 25% Líder + resto proporcional en tus activos."):
+                            _apply_multi_preset(20.0, 25.0, 0.0)
+                    with pcol4:
+                        if st.button("🚀 Crecimiento", use_container_width=True, help="10% Cash + 40% Líder + resto en tus activos."):
+                            _apply_multi_preset(10.0, 40.0, 0.0)
+                    with pcol5:
+                        if st.button("🔄 Pesos Actuales", use_container_width=True, help="Restablecer todos los controles a tus pesos de mercado actuales."):
+                            cur_s = 0.0
+                            for ct in candidate_tickers:
+                                w_now = (current_assets_live[ct]['mv'] / total_nav * 100.0) if (ct in current_assets_live and total_nav > 0) else 0.0
+                                w_r = round(w_now, 1)
+                                st.session_state[f"rebal_w_{ct}"] = float(w_r)
+                                cur_s += w_r
+                            st.session_state["rebal_multi_cash"] = float(max(0.0, round(100.0 - cur_s, 1)))
+
+                    if st.session_state.pop("pending_autobalance", False):
+                        cur_vals_b = {ct: float(st.session_state.get(f"rebal_w_{ct}", 0.0)) for ct in candidate_tickers}
+                        cur_cash_b = float(st.session_state.get("rebal_multi_cash", 0.0))
+                        total_b = sum(cur_vals_b.values()) + cur_cash_b
+                        if total_b > 0:
+                            factor_b = 100.0 / total_b
+                            acc_b = 0.0
+                            for ct in candidate_tickers:
+                                new_b = round(cur_vals_b[ct] * factor_b, 1)
+                                st.session_state[f"rebal_w_{ct}"] = float(new_b)
+                                acc_b += new_b
+                            st.session_state["rebal_multi_cash"] = float(max(0.0, round(100.0 - acc_b, 1)))
+
+                    # Controles interactivos para cada activo en cartera + líder + refugio + CASH
+                    st.write("**🎛️ Asignación Multi-Activo Objetivo (%)**")
+                    n_cols_grid = min(4, max(2, len(candidate_tickers) + 1))
+                    grid_cols = st.columns(n_cols_grid)
+                    target_pct_map = {}
+                    for idx_c, ct in enumerate(candidate_tickers):
+                        tag = ""
+                        if ct == leader_etf:
+                            tag = " ⭐Líder"
+                        elif ct == hedge_etf:
+                            tag = " 🛡️Refugio"
+                        elif ct in current_assets_live:
+                            tag = " 📌Actual"
+                        with grid_cols[idx_c % n_cols_grid]:
+                            val_in = st.number_input(
+                                f"{ct}{tag} (%)",
+                                min_value=0.0,
+                                max_value=100.0,
+                                step=1.0,
+                                key=f"rebal_w_{ct}"
+                            )
+                            target_pct_map[ct] = float(val_in)
+
+                    with grid_cols[len(candidate_tickers) % n_cols_grid]:
+                        tune_cash_multi = st.number_input(
+                            "💵 CASH (%)",
+                            min_value=0.0,
+                            max_value=100.0,
+                            step=1.0,
+                            key="rebal_multi_cash"
+                        )
+
+                    raw_sum_pcts = round(sum(target_pct_map.values()) + float(tune_cash_multi), 1)
+                    sum_pcts = raw_sum_pcts
+                    is_balanced_100 = abs(raw_sum_pcts - 100.0) <= 0.1
+
+                    if not is_balanced_100:
+                        bal_col1, bal_col2 = st.columns([3, 1])
+                        with bal_col1:
+                            st.error(f"⚠️ **Distribución descuadrada:** La suma actual es **{raw_sum_pcts:.1f}%** (debe ser exactamente **100.0%**).")
+                        with bal_col2:
+                            if st.button("✨ Auto-Cuadrar 100%", use_container_width=True, key="btn_autobalance_100"):
+                                if raw_sum_pcts > 0:
+                                    st.session_state["pending_autobalance"] = True
+                                    st.rerun()
+
+                        norm_factor = (100.0 / raw_sum_pcts) if raw_sum_pcts > 0 else 1.0
+                        target_pct_map = {k: v * norm_factor for k, v in target_pct_map.items()}
+                        target_cash_pct = float(tune_cash_multi) * norm_factor
+                    else:
+                        st.success("✅ **Balanza Cuadrada (100.0%):** Distribución multi-activo válida.")
+                        target_cash_pct = float(tune_cash_multi)
+
                 else:
-                    st.success("✅ **Balanza Cuadrada (100%):** Distribución perfecta confirmada.")
-                    target_pct_map = {
-                        leader_etf: float(tune_lider),
-                        "SPY": float(tune_core)
-                    }
-                    target_cash_pct = float(tune_cash)
+                    # Modo Clásico (Rotación Pura 3/4 Bloques)
+                    with pcol1:
+                        if st.button(f"🎯 Auto VIX ({vix_live:.1f})", use_container_width=True, help="Calibra Líder, SPY, Refugio y Cash según VIX."):
+                            if vix_live < 15.0:
+                                st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 45, 45, 0, 10
+                            elif vix_live <= 20.0:
+                                st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 30, 50, 0, 20
+                            else:
+                                st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 15, 35, 20, 30
+                    with pcol2:
+                        if st.button("🛡️ Defensivo", use_container_width=True, help="15% Líder / 35% SPY / 15% Refugio / 35% Cash"):
+                            st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 15, 35, 15, 35
+                    with pcol3:
+                        if st.button("⚖️ Moderado", use_container_width=True, help="30% Líder / 50% SPY / 0% Refugio / 20% Cash"):
+                            st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 30, 50, 0, 20
+                    with pcol4:
+                        if st.button("🚀 Crecimiento", use_container_width=True, help="50% Líder / 40% SPY / 0% Refugio / 10% Cash"):
+                            st.session_state['rebal_lider'], st.session_state['rebal_core'], st.session_state['rebal_hedge_classic'], st.session_state['rebal_cash'] = 50, 40, 0, 10
+                    with pcol5:
+                        if st.button("🔄 Propuesta", use_container_width=True, help="Restablecer a los valores de la señal de Prometheus"):
+                            st.session_state['rebal_lider'] = int(round(lider_pct))
+                            st.session_state['rebal_core'] = int(round(core_pct))
+                            st.session_state['rebal_hedge_classic'] = 0
+                            st.session_state['rebal_cash'] = int(round(cash_pct))
 
-                # 2. Compute Rebalancing & Drift Portfolio Metrics
+                    scol1, scol2, scol3, scol4 = st.columns(4)
+                    with scol1:
+                        tune_lider = st.slider(f"Líder ({leader_etf}) (%)", 0, 100, key="rebal_lider", step=5)
+                    with scol2:
+                        tune_core = st.slider("Core (SPY) (%)", 0, 100, key="rebal_core", step=5)
+                    with scol3:
+                        tune_hedge_c = st.slider(f"Refugio ({hedge_etf}) (%)", 0, 100, key="rebal_hedge_classic", step=5)
+                    with scol4:
+                        tune_cash = st.slider("Efectivo (CASH) (%)", 0, 100, key="rebal_cash", step=5)
+
+                    sum_pcts = float(tune_lider + tune_core + tune_hedge_c + tune_cash)
+                    is_balanced_100 = abs(sum_pcts - 100.0) <= 0.1
+
+                    raw_classic = {}
+                    for k_c, v_c in [(leader_etf, tune_lider), ("SPY", tune_core), (hedge_etf, tune_hedge_c)]:
+                        raw_classic[k_c] = raw_classic.get(k_c, 0.0) + float(v_c)
+
+                    if not is_balanced_100:
+                        st.error(f"⚠️ **Incompatibilidad de distribución:** La suma actual es **{sum_pcts:.0f}%** (debe ser exactamente **100%**).")
+                        norm_factor = (100.0 / sum_pcts) if sum_pcts > 0 else 1.0
+                        target_pct_map = {k: v * norm_factor for k, v in raw_classic.items()}
+                        target_cash_pct = float(tune_cash) * norm_factor
+                    else:
+                        st.success("✅ **Balanza Cuadrada (100%):** Distribución perfecta confirmada.")
+                        target_pct_map = raw_classic
+                        target_cash_pct = float(tune_cash)
+
+                # --- 2. CÁLCULO DE ÓRDENES, DRIFT E IMPACTO EN RIESGO (PRE VS POST) ---
                 orders = []
-                all_involved_tickers = list(set(list(current_p['assets'].keys()) + list(target_pct_map.keys())))
-                
+                all_involved_tickers = list(dict.fromkeys(
+                    [t for t in current_p['assets'].keys() if t != "CASH"]
+                    + list(target_pct_map.keys())
+                ))
+
                 sum_abs_drift = 0.0
                 rebal_table_rows = []
 
                 for ticker in all_involved_tickers:
-                    if ticker == "CASH":
-                        continue
-                    
-                    target_pct = target_pct_map.get(ticker, 0.0)
+                    target_pct = float(target_pct_map.get(ticker, 0.0))
                     target_val = total_nav * (target_pct / 100.0)
-                    
-                    current_val = 0.0
-                    shares_curr = 0.0
-                    if ticker in current_p['assets']:
-                        asset_info = current_p['assets'][ticker]
-                        if isinstance(asset_info, dict):
-                            shares_curr = float(asset_info.get('shares', 0.0))
-                            current_val = shares_curr * float(last_prices.get(ticker, asset_info.get('price', 0.0)))
-                        else:
-                            current_val = float(current_p['total_value']) * (float(str(asset_info).strip('%')) / 100)
-                    
+
+                    curr_info = current_assets_live.get(ticker, {"shares": 0.0, "price": 0.0, "mv": 0.0})
+                    current_val = curr_info["mv"]
+                    shares_curr = curr_info["shares"]
                     current_pct = (current_val / total_nav * 100.0) if total_nav > 0 else 0.0
+
+                    # Omitir de la tabla los tickers auxiliares con 0% actual y 0% objetivo
+                    if current_pct == 0.0 and target_pct == 0.0:
+                        continue
+
                     drift_pct_item = target_pct - current_pct
                     sum_abs_drift += abs(drift_pct_item)
 
-                    price = float(last_prices.get(ticker, 0.0))
-                    if price == 0.0 and ticker in current_p['assets'] and isinstance(current_p['assets'][ticker], dict):
-                        price = float(current_p['assets'][ticker].get('price', 0.0))
-                    
+                    price = float(last_prices.get(ticker, 0.0) or 0.0)
+                    if price == 0.0 or pd.isna(price):
+                        price = float(curr_info["price"] or 0.0)
+
                     diff_val = target_val - current_val
-                    shares_diff = diff_val / price if price > 0 else 0.0
+                    shares_diff = (diff_val / price) if price > 0 else 0.0
 
                     if price > 0:
                         orders.append({
                             "ticker": ticker,
                             "target_pct": f"{target_pct:.2f}%",
+                            "target_pct_num": target_pct,
                             "current_pct": f"{current_pct:.2f}%",
                             "target_val": target_val,
                             "current_val": current_val,
@@ -1841,18 +2099,15 @@ elif menu == "Mi Portafolio":
 
                     rebal_table_rows.append({
                         "Ticker": ticker,
-                        "Precio ($)": f"${price:,.2f}",
+                        "Precio ($)": f"${price:,.2f}" if price > 0 else "N/A",
                         "Peso Actual": f"{current_pct:.1f}%",
-                        "Peso Mas": f"{target_pct:.1f}%",
+                        "Peso Objetivo": f"{target_pct:.1f}%",
                         "Acciones": f"{shares_curr:.2f}",
                         "Val. Actual": f"${current_val:,.2f}",
                         "Val. Objetivo": f"${target_val:,.2f}",
                         "Desviación (Drift)": f"{'+' if drift_pct_item >= 0 else ''}{drift_pct_item:.1f}%"
                     })
 
-                # Append cash to the metrics calculations manually to complete Drift Index
-                current_cash_val = current_p.get('cash', 0.0)
-                current_cash_pct = (current_cash_val / total_nav * 100.0) if total_nav > 0 else 0.0
                 cash_drift = target_cash_pct - current_cash_pct
                 sum_abs_drift += abs(cash_drift)
 
@@ -1860,42 +2115,76 @@ elif menu == "Mi Portafolio":
                     "Ticker": "💵 CASH / CAJA",
                     "Precio ($)": "$1.00",
                     "Peso Actual": f"{current_cash_pct:.1f}%",
-                    "Peso Mas": f"{target_cash_pct:.1f}%",
-                    "Acciones": "N/A",
+                    "Peso Objetivo": f"{target_cash_pct:.1f}%",
+                    "Acciones": "—",
                     "Val. Actual": f"${current_cash_val:,.2f}",
                     "Val. Objetivo": f"${(total_nav * (target_cash_pct / 100.0)):,.2f}",
                     "Desviación (Drift)": f"{'+' if cash_drift >= 0 else ''}{cash_drift:.1f}%"
                 })
 
-                # Overall Drift Index
                 portfolio_drift_index = sum_abs_drift / 2.0
-                
-                # Visual Section (Metrics + Chart)
+
+                # Cálculo de Impacto Pre vs Post en Beta y Volatilidad (Opción 4)
+                rets_rebal = px_rebal_base.pct_change().dropna(axis=1, how='all').dropna()
+                pre_beta, post_beta = 1.0, 1.0
+                pre_vol, post_vol = 0.0, 0.0
+                has_risk_preview = len(rets_rebal) > 2 and 'SPY' in rets_rebal.columns
+
+                if has_risk_preview:
+                    spy_series = rets_rebal['SPY']
+                    spy_var = float(np.var(spy_series))
+
+                    pre_port_rets = pd.Series(0.0, index=rets_rebal.index)
+                    for tk, cinfo in current_assets_live.items():
+                        if tk in rets_rebal.columns and total_nav > 0:
+                            pre_port_rets += rets_rebal[tk] * (cinfo['mv'] / total_nav)
+
+                    post_port_rets = pd.Series(0.0, index=rets_rebal.index)
+                    for tk, tp in target_pct_map.items():
+                        if tk in rets_rebal.columns and tp > 0:
+                            post_port_rets += rets_rebal[tk] * (tp / 100.0)
+
+                    pre_vol = float(pre_port_rets.std() * np.sqrt(252) * 100.0)
+                    post_vol = float(post_port_rets.std() * np.sqrt(252) * 100.0)
+
+                    if spy_var > 0:
+                        pre_beta = float(np.cov(pre_port_rets, spy_series)[0, 1] / spy_var)
+                        post_beta = float(np.cov(post_port_rets, spy_series)[0, 1] / spy_var)
+
+                # Visual Section (Metrics + Impacto Riesgo Pre/Post)
                 st.write("")
-                col_m1, col_m2, col_m3 = st.columns(3)
+                col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
                 with col_m1:
                     st.metric("Cartera NAV Total ($)", f"${total_nav:,.2f}", help="Suma combinada de activos valorados en tiempo real más el capital líquido.")
                 with col_m2:
-                    st.metric("Sectores en Rebalanceo", f"{len(orders)} Activos Tácticos", help="Número de holdings financieros involucrados en el reajuste.")
+                    active_orders_count = sum(1 for o in orders if abs(o['shares_to_buy']) >= 0.01)
+                    st.metric("Órdenes Requeridas", f"{active_orders_count} Movimientos", help="Activos cuya posición cambia tras el rebalanceo.")
                 with col_m3:
                     if portfolio_drift_index < 5.0:
                         drift_status = "Equilibrada ✅"
-                        drift_color = "green"
                     elif portfolio_drift_index < 15.0:
                         drift_status = "Deriva Leve ⚠️"
-                        drift_color = "orange"
                     else:
-                        drift_status = "Desajuste Importante 🚨"
-                        drift_color = "red"
-                    
-                    st.metric("Índice de Deriva (Drift)", f"{portfolio_drift_index:.2f}%", drift_status, help="Dispersión agregada con respecto a los objetivos estratégicos.")
+                        drift_status = "Desajuste 🚨"
+                    st.metric("Índice de Deriva", f"{portfolio_drift_index:.2f}%", drift_status, help="Dispersión agregada respecto a los pesos objetivo.")
+                with col_m4:
+                    if has_risk_preview:
+                        beta_delta = post_beta - pre_beta
+                        st.metric("Beta Post-Rebalanceo", f"{post_beta:.2f}", f"{beta_delta:+.2f} vs actual ({pre_beta:.2f})", delta_color="inverse", help="Sensibilidad estimada frente al S&P 500 tras ejecutar el rebalanceo (incluye el efecto amortiguador de CASH y cobertura).")
+                    else:
+                        st.metric("Beta Post-Rebalanceo", "N/A")
+                with col_m5:
+                    if has_risk_preview:
+                        vol_delta = post_vol - pre_vol
+                        st.metric("Volatilidad Est.", f"{post_vol:.2f}%", f"{vol_delta:+.2f}% vs actual ({pre_vol:.2f}%)", delta_color="inverse", help="Volatilidad anualizada estimada de la cartera resultante.")
+                    else:
+                        st.metric("Volatilidad Est.", "N/A")
 
                 # Dual Column (Left Chart, Right table breakdown)
                 col_vis1, col_vis2 = st.columns([1, 1])
                 with col_vis1:
                     st.write("**📊 Comparativa de Pesos: Actual vs Objetivo**")
-                    
-                    # Prepare comparison DataFrame
+
                     chart_records = []
                     for row in rebal_table_rows:
                         chart_records.append({
@@ -1906,15 +2195,15 @@ elif menu == "Mi Portafolio":
                         chart_records.append({
                             "Activo": row["Ticker"],
                             "Distribución": "Objetivo",
-                            "Ponderación (%)": float(row["Peso Mas"].replace('%', ''))
+                            "Ponderación (%)": float(row["Peso Objetivo"].replace('%', ''))
                         })
-                    
+
                     df_compare = pd.DataFrame(chart_records)
                     fig_comp = px.bar(
-                        df_compare, 
-                        x="Activo", 
-                        y="Ponderación (%)", 
-                        color="Distribución", 
+                        df_compare,
+                        x="Activo",
+                        y="Ponderación (%)",
+                        color="Distribución",
                         barmode="group",
                         color_discrete_map={"Actual": "#3b82f6", "Objetivo": "#f97316"},
                         text_auto=".1f"
@@ -1936,12 +2225,11 @@ elif menu == "Mi Portafolio":
                 # Batched Orders & Execution Section
                 st.divider()
                 st.write("**🎟️ Plan Operativo de Órdenes a Ejecutar**")
-                
+
                 orders_sorted = sorted(orders, key=lambda x: x['shares_to_buy'])
 
                 col_ord1, col_ord2 = st.columns([2, 1])
                 with col_ord1:
-                    # Draw order cards formatted elegantly
                     has_pending_actions = False
                     for o in orders_sorted:
                         if abs(o['shares_to_buy']) < 0.01:
@@ -1951,7 +2239,7 @@ elif menu == "Mi Portafolio":
                         icon = "🟢" if action == "COMPRAR" else "🔴"
                         status_word = "Adición de posición institucional" if action == "COMPRAR" else "Optimización y venta de excedentes"
                         border_color = "#34d399" if action == "COMPRAR" else "#ef4444"
-                        
+
                         st.markdown(f"""
                         <div style="background-color: #0c0c14; padding: 14px; border-radius: 6px; margin-bottom: 10px; border-left: 5px solid {border_color}; border-right: 1px solid #1e1b4b; border-top: 1px solid #1e1b4b; border-bottom: 1px solid #1e1b4b;">
                             <div style="display: flex; justify-content: space-between;">
@@ -1964,17 +2252,16 @@ elif menu == "Mi Portafolio":
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
-                    
-                    # Cash Adjustment details info
+
                     target_cash_val = total_nav * (target_cash_pct / 100.0)
                     diff_cash = target_cash_val - current_cash_val
-                    
+
                     st.markdown(f"""
                     <div style="background-color: #0d1527; padding: 12px; border-radius: 6px; border: 1px solid #1e293b; margin-top: 10px;">
                         <span style="font-size: 13.5px; font-weight: bold; color: #60a5fa;">💵 Modificación Neta en Efectivo (Caja)</span><br>
                         <span style="font-size: 12px; color: #94a3b8;">
-                            Caja de Seguridad Actual: ${current_cash_val:,.2f} ({current_cash_pct:.1f}%) | 
-                            Caja Requerida Objetivo: ${target_cash_val:,.2f} ({target_cash_pct:.1f}%)<br>
+                            Caja Actual: ${current_cash_val:,.2f} ({current_cash_pct:.1f}%) | 
+                            Caja Objetivo: ${target_cash_val:,.2f} ({target_cash_pct:.1f}%)<br>
                             Flujo Neto de Efectivo Requerido: <b>{'+' if diff_cash >= 0 else ''}${diff_cash:,.2f}</b>
                         </span>
                     </div>
@@ -1986,58 +2273,58 @@ elif menu == "Mi Portafolio":
                 with col_ord2:
                     st.markdown('<div class="metric-card" style="border-top: 4px solid #f97316; padding: 18px; background-color: #0c0c0f; border-radius: 6px; border-left: 1px solid #1b1b22; border-right: 1px solid #1b1b22; border-bottom: 1px solid #1b1b22;">', unsafe_allow_html=True)
                     st.markdown("<h4 style='color:#f97316; margin-top:0;'>🔒 Consolidación Institucional</h4>", unsafe_allow_html=True)
-                    st.caption("Al confirmar, Prometheus recalculará de forma inmediata las acciones, ajustando el saldo líquido de la cuenta de inversión.")
-                    
+                    st.caption("Al confirmar, Prometheus recalculará las acciones, ajustará el saldo de caja y actualizará automáticamente el Dashboard, Auditoría y Riesgo.")
+
                     st.divider()
-                    
-                    # Compute simulated transactions stats
+
                     total_vol_trade = sum([abs(o['diff_abs']) for o in orders])
-                    est_commission = total_vol_trade * 0.001 # 0.1% typical Broker fee
+                    est_commission = total_vol_trade * 0.001
                     efficiency_score = max(0, 100 - (portfolio_drift_index * 0.5))
 
                     st.write(f"**Volumen Total Negociado:** ${total_vol_trade:,.2f}")
                     st.write(f"**Comisiones Est. (0.1%):** ${est_commission:,.2f}")
                     st.write(f"**Score de Eficiencia:** {efficiency_score:.1f}/100")
-                    
-                    if sum_pcts != 100:
-                        st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True, disabled=True, help="Corrige los pesos para sumar 100% primero.")
+
+                    if not is_balanced_100:
+                        st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True, disabled=True, help="Corrige los pesos para sumar exactamente 100% primero.")
                     else:
                         if st.button("⚡ ACEPTAR Y EJECUTAR REBALANCEO", use_container_width=True, key="btn_ejecuta_rebalanceo_new"):
                             with st.spinner("Ejecutando operaciones en el core de datos..."):
                                 final_assets = {}
                                 total_market_v_new = 0.0
-                                
-                                # Build assets dictionary according to target shares
+
                                 for o in orders:
-                                    o_target_pct = float(o['target_pct'].replace('%', ''))
+                                    o_target_pct = float(o['target_pct_num'])
                                     if o_target_pct > 0:
                                         target_val_new = total_nav * (o_target_pct / 100.0)
                                         price_curr = float(o['price'])
                                         new_sh_count = target_val_new / price_curr if price_curr > 0 else 0.0
-                                        
+
                                         final_assets[o['ticker']] = {
                                             "weight": f"{o_target_pct:.2f}%",
                                             "shares": float(new_sh_count),
                                             "price": float(price_curr)
                                         }
                                         total_market_v_new += target_val_new
-                                
+
                                 target_cash_new = total_nav * (target_cash_pct / 100.0)
-                                spy_px_new = float(last_prices.get('SPY', 450.0))
-                                
-                                # Guardar portafolio rebalanceado
+                                raw_spy_px = last_prices.get('SPY', 450.0)
+                                spy_px_new = float(raw_spy_px) if (raw_spy_px is not None and pd.notna(raw_spy_px) and float(raw_spy_px) > 0) else 450.0
+
                                 db_lib.save_portfolio(final_assets, float(total_market_v_new), float(target_cash_new), float(spy_px_new))
                                 st.session_state.portfolio_sync_id = None
-                                
-                                # Log the action on the database learning history
+                                st.session_state.rebal_sync_token = None
+
+                                mode_tag = "Cartera Completa" if is_full_portfolio_mode else "Rotación Pura"
+                                beta_note = f" Beta: {pre_beta:.2f} -> {post_beta:.2f}." if has_risk_preview else ""
                                 db_lib.log_learning_insight(
-                                    "USER", 
-                                    f"Operador ejecutó rebalanceo táctico de cartera. Drift inicial: {portfolio_drift_index:.1f}% optimizado a 0.0%. Volumen transaccionado: ${total_vol_trade:,.2f}.", 
-                                    "HIGH", 
+                                    "USER",
+                                    f"Rebalanceo [{mode_tag}] ejecutado bajo VIX {vix_live:.2f}. Drift inicial {portfolio_drift_index:.1f}% -> 0.0%. Volumen: ${total_vol_trade:,.2f}.{beta_note}",
+                                    "HIGH",
                                     True
                                 )
-                                
-                                st.success("¡Plan de Rebalanceo ejecutado con éxito! Pesos equilibrados en base de datos.")
+
+                                st.success("¡Plan de Rebalanceo ejecutado con éxito! Cartera y Auditoría sincronizadas.")
                                 st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
